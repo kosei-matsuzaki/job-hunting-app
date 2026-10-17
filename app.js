@@ -8,13 +8,19 @@ const DOC_GROUPS = [
 ];
 const EXTRA_DOCS = [{ path: "links.md", name: "就活サイト・対策" }];
 
-// 一覧の並び順。ここにないステータスは「準備中」の末尾に入る
-const STATUSES = [
-  "内定", "最終面接", "二次面接", "一次面接", "面接", "WEBテスト", "書類選考", "ES提出",
-  "エントリー", "インターン", "説明会", "情報更新待ち", "エントリー待ち", "辞退", "不合格",
-];
-const IN_PROGRESS = new Set(["内定", "最終面接", "二次面接", "一次面接", "面接", "WEBテスト", "書類選考", "ES提出"]);
-const CLOSED = new Set(["辞退", "不合格"]);
+// 状況（state）と、選考フローの中のいまの段階（step）を分けて持つ
+const STATES = {
+  todo: { label: "対応中", hint: "自分の番。準備・提出・受験・面接を控えている" },
+  waiting: { label: "結果待ち", hint: "相手の番。結果や連絡を待っている" },
+  before: { label: "エントリー前", hint: "まだ応募していない・受付開始待ち" },
+  offer: { label: "内定", hint: "" },
+  declined: { label: "辞退", hint: "" },
+  rejected: { label: "不合格", hint: "" },
+};
+const LIVE_STATES = ["before", "todo", "waiting"];
+const ENDED = new Set(["declined", "rejected"]);
+const TRACKS = ["本選考", "インターン"];
+const DEFAULT_FLOW = ["ES", "Webテスト", "一次面接", "最終面接"];
 const WD = "日月火水木金土";
 const PAST_DAYS = 14;
 
@@ -223,17 +229,24 @@ const eventTitle = (e) => esc(e.title) + (e.tentative ? '<span class="tentative"
 
 const bySlug = (slug) => state.companies.find((c) => c.slug === slug);
 
-function statusRank(c) {
-  const i = STATUSES.indexOf(c.status);
-  return i < 0 ? STATUSES.indexOf("エントリー待ち") : i;
+const stateOf = (c) => (STATES[c.state] ? c.state : "before");
+const flowIndex = (c) => (c.flow || []).indexOf(c.step);
+
+function statusPill(c) {
+  const s = stateOf(c);
+  if (s === "before") return ""; // 一覧の見出しと同じなので出さない
+  const step = flowIndex(c) >= 0 && LIVE_STATES.includes(s) ? `<span class="step-name">${esc(c.step)}</span>` : "";
+  return `${step}<span class="pill ${s}">${STATES[s].label}</span>`;
 }
 
-function flowIndex(c) {
-  const f = c.flow || [];
-  const s = c.status || "";
-  const exact = f.indexOf(s);
-  if (exact >= 0) return exact;
-  return f.findIndex((x) => s.includes(x) || (s.length >= 2 && x.includes(s)));
+// 状況を変えて、記録を残して保存する
+async function updateStatus(c, patch, note) {
+  Object.assign(c, patch);
+  c.lastAction = isoToday();
+  c.history = [{ date: isoToday(), text: note }, ...(c.history || [])];
+  render();
+  await saveCompanies(`${c.name}: ${note}`);
+  render();
 }
 
 function allEvents() {
@@ -261,12 +274,12 @@ function routeMini(c) {
 const $view = () => document.getElementById("view");
 
 function viewSchedule() {
-  const live = allEvents().filter((e) => !e.done && !CLOSED.has(e.c.status));
+  const live = allEvents().filter((e) => !e.done && !ENDED.has(e.c.state));
   const upcoming = live.filter((e) => daysUntil(e.date) >= 0).sort((a, b) => evKey(a).localeCompare(evKey(b)));
   const past = live
     .filter((e) => daysUntil(e.date) < 0 && daysUntil(e.date) >= -PAST_DAYS)
     .sort((a, b) => evKey(b).localeCompare(evKey(a)));
-  const todos = state.companies.filter((c) => c.todo?.length && !CLOSED.has(c.status));
+  const todos = state.companies.filter((c) => c.todo?.length && !ENDED.has(c.state));
 
   let html = "";
   const [head, ...rest] = upcoming;
@@ -291,6 +304,13 @@ function viewSchedule() {
   } else {
     html += `<section class="empty">登録されている予定はありません。企業ページの「編集」から締切を追加してください。</section>`;
   }
+
+  const tally = ["todo", "waiting", "before", "offer"]
+    .map((s) => ({ s, n: state.companies.filter((c) => stateOf(c) === s).length }))
+    .filter((t) => t.n);
+  html += `<a class="tally" href="#/companies">${tally
+    .map((t) => `<span class="tally-item ${t.s}"><span class="tally-n">${t.n}</span>${STATES[t.s].label}</span>`)
+    .join("")}</a>`;
 
   if (rest.length) {
     html += `<h2 class="sec">この先の予定</h2><ol class="timetable">`;
@@ -347,27 +367,40 @@ function viewSchedule() {
 }
 
 function viewCompanies() {
-  const sorted = [...state.companies].sort((a, b) => statusRank(a) - statusRank(b) || a.name.localeCompare(b.name, "ja"));
+  // 締切が近い順、予定のない企業は名前順で後ろに
+  const order = (a, b) => {
+    const na = nextEvent(a);
+    const nb = nextEvent(b);
+    if (na && nb) return evKey(na).localeCompare(evKey(nb));
+    if (na || nb) return na ? -1 : 1;
+    return a.name.localeCompare(b.name, "ja");
+  };
   const groups = [
-    { label: "選考中", items: sorted.filter((c) => IN_PROGRESS.has(c.status) || (!CLOSED.has(c.status) && flowIndex(c) >= 0)) },
-    { label: "準備中", items: sorted.filter((c) => !IN_PROGRESS.has(c.status) && !CLOSED.has(c.status) && flowIndex(c) < 0) },
-    { label: "終了", items: sorted.filter((c) => CLOSED.has(c.status)) },
-  ];
+    { s: "todo", label: "対応中" },
+    { s: "waiting", label: "結果待ち" },
+    { s: "offer", label: "内定" },
+    { s: "before", label: "エントリー前" },
+  ].map((g) => ({ ...g, items: state.companies.filter((c) => stateOf(c) === g.s).sort(order) }));
+  const ended = state.companies.filter((c) => ENDED.has(stateOf(c)));
+
+  const row = (c) => {
+    const nx = nextEvent(c);
+    return `
+      <li><a class="co" href="#/c/${esc(c.slug)}">
+        <span class="co-name">${esc(c.name)}${c.track === "インターン" ? '<span class="track">インターン</span>' : ""}</span>
+        <span class="co-ind">${esc(c.industry || "")}</span>
+        <span class="co-status">${routeMini(c)}${statusPill(c)}</span>
+        ${nx ? `<span class="co-next ${urgency(daysUntil(nx.date))}">${esc(fmtDate(nx.date, otherYear(nx.date)))} ${esc(nx.title)}</span>` : ""}
+      </a></li>`;
+  };
+
   let html = `<div class="list-head"><h1 class="page-title">企業</h1><a class="btn" href="#/new">企業を追加</a></div>`;
   for (const g of groups) {
     if (!g.items.length) continue;
-    html += `<h2 class="sec">${g.label}<span class="count">${g.items.length}</span></h2><ul class="companies">`;
-    for (const c of g.items) {
-      const nx = nextEvent(c);
-      html += `
-        <li><a class="co" href="#/c/${esc(c.slug)}">
-          <span class="co-name">${esc(c.name)}</span>
-          <span class="co-ind">${esc(c.industry || "")}</span>
-          <span class="co-status">${routeMini(c)}<span>${esc(c.status || "未設定")}</span></span>
-          ${nx ? `<span class="co-next ${urgency(daysUntil(nx.date))}">${esc(fmtDate(nx.date, otherYear(nx.date)))} ${esc(nx.title)}</span>` : ""}
-        </a></li>`;
-    }
-    html += `</ul>`;
+    html += `<h2 class="sec">${g.label}<span class="count">${g.items.length}社</span></h2><ul class="companies">${g.items.map(row).join("")}</ul>`;
+  }
+  if (ended.length) {
+    html += `<details class="ended"><summary>終了した企業（${ended.length}社）</summary><ul class="companies">${ended.map(row).join("")}</ul></details>`;
   }
   return html;
 }
@@ -403,31 +436,57 @@ function viewCompany(slug) {
     c.salary ? `初任給 ¥${Number(c.salary).toLocaleString()}` : "",
     c.lastAction ? `最終アクション ${fmtDate(c.lastAction, true)}` : "",
   ].filter(Boolean);
-  const options = [...new Set([...STATUSES, c.status].filter(Boolean))]
-    .map((s) => `<option${s === c.status ? " selected" : ""}>${esc(s)}</option>`)
-    .join("");
+  const s = stateOf(c);
   const notePath = `notes/${c.slug}.md`;
   const hasNote = state.docs?.find((g) => g.dir === "notes")?.paths.includes(notePath);
+  const slug_ = esc(c.slug);
 
   let html = `
     <a class="back" href="#/companies">企業一覧</a>
     <div class="detail-head">
-      <h1 class="page-title">${esc(c.name)}</h1>
-      <a class="btn" href="#/c/${esc(c.slug)}/edit">編集</a>
+      <h1 class="page-title">${esc(c.name)}${c.track === "インターン" ? '<span class="track">インターン</span>' : ""}</h1>
+      <a class="btn" href="#/c/${slug_}/edit">編集</a>
     </div>
     <p class="meta">${meta.map(esc).join("　")}</p>
-    <label class="status-pick">ステータス
-      <select data-status="${esc(c.slug)}">${options}</select>
-    </label>`;
+    <section class="state-panel ${s}">`;
+
+  if (ENDED.has(s) || s === "offer") {
+    html += `
+      <p class="state-final"><span class="pill ${s}">${STATES[s].label}</span>${c.step ? `${esc(c.step)}まで進みました` : ""}</p>
+      <button class="mini" data-state="${slug_}:todo">選考中に戻す</button>`;
+  } else {
+    html += `<div class="seg" role="group" aria-label="いまの状況">${LIVE_STATES.map(
+      (k) => `<button data-state="${slug_}:${k}" aria-pressed="${k === s}">${STATES[k].label}</button>`,
+    ).join("")}</div>
+      <p class="hint">${esc(STATES[s].hint)}</p>`;
+  }
 
   if (f.length) {
-    html += `<h2 class="sec">選考フロー</h2><ol class="route">`;
-    f.forEach((s, i) => {
-      const cls = i < idx ? "past" : i === idx ? "now" : "";
-      html += `<li class="${cls}"><span class="st"></span><span class="route-name">${esc(s)}</span>${i === idx ? '<span class="here">いまここ</span>' : ""}</li>`;
+    html += `<ol class="route${ENDED.has(s) ? " dim" : ""}">`;
+    f.forEach((name, i) => {
+      const cls = s === "offer" || i < idx ? "past" : i === idx ? "now" : "";
+      const tag = i === idx && LIVE_STATES.includes(s) && s !== "before" ? `<span class="here ${s}">${STATES[s].label}</span>` : "";
+      html += `<li class="${cls}"><button class="station" data-step="${slug_}:${i}" aria-label="段階を「${esc(name)}」にする">
+        <span class="st"></span><span class="route-name">${esc(name)}</span>${tag}</button></li>`;
     });
-    html += `</ol>`;
+    html += `</ol><p class="hint">駅をタップすると、いまの段階を変えられます。</p>`;
+  } else {
+    html += `<p class="hint">選考フローが未設定です。「編集」で入れると、ここに路線図が出ます。</p>`;
   }
+
+  if (LIVE_STATES.includes(s)) {
+    const next = idx >= 0 ? f[idx + 1] : f[0];
+    const passLabel = idx < 0 ? (f[0] ? `エントリーした（次は${f[0]}）` : "") : next ? `${f[idx]}を通過した（次は${next}）` : `${f[idx]}を通過した（内定）`;
+    html += `<div class="outcomes">
+      ${passLabel ? `<button class="btn primary wide" data-pass="${slug_}">${esc(passLabel)}</button>` : ""}
+      <div class="outcome-row">
+        <button class="mini" data-state="${slug_}:offer">内定</button>
+        <button class="mini" data-state="${slug_}:declined">辞退した</button>
+        <button class="mini danger" data-state="${slug_}:rejected">不合格だった</button>
+      </div>
+    </div>`;
+  }
+  html += `</section>`;
 
   const mp = mypageBlock(c);
   if (mp) html += `<h2 class="sec">マイページ</h2><div class="creds">${mp}</div>`;
@@ -459,6 +518,12 @@ function viewCompany(slug) {
       .map((l) => `<li><a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.label || l.url)}</a></li>`)
       .join("")}</ul>`;
   }
+  if (c.history?.length) {
+    html += `<h2 class="sec">これまでの記録</h2><ol class="history">${c.history
+      .slice(0, 20)
+      .map((h) => `<li><span class="h-date">${esc(fmtDate(h.date, otherYear(h.date)))}</span>${esc(h.text)}</li>`)
+      .join("")}</ol>`;
+  }
   if (c.memo?.trim()) {
     html += `<h2 class="sec">メモ</h2><div class="md">${renderMarkdown(c.memo)}</div>`;
   }
@@ -487,7 +552,7 @@ function eventRow(e = {}) {
 
 function viewEdit(slug) {
   const isNew = !slug;
-  const c = isNew ? { flow: [], events: [], mypage: {}, links: [], todo: [] } : bySlug(slug);
+  const c = isNew ? { flow: DEFAULT_FLOW, events: [], mypage: {}, links: [], todo: [] } : bySlug(slug);
   if (!c) return `<p class="empty">この企業は見つかりません。</p>`;
   const m = c.mypage || {};
   return `
@@ -497,11 +562,10 @@ function viewEdit(slug) {
       <label>会社名<input name="name" required value="${esc(c.name || "")}"></label>
       ${isNew ? `<label>英字の識別名（ノートのファイル名になる。例: capcom）<input name="slug" required pattern="[a-z0-9-]+" autocapitalize="off"></label>` : ""}
       <label>業界・職種<input name="industry" value="${esc(c.industry || "")}"></label>
-      <label>ステータス<input name="status" list="statuses" value="${esc(c.status || "エントリー待ち")}"></label>
-      <datalist id="statuses">${STATUSES.map((s) => `<option value="${esc(s)}">`).join("")}</datalist>
+      <label>選考の種類<select name="track">${TRACKS.map((t) => `<option${t === (c.track || "本選考") ? " selected" : ""}>${t}</option>`).join("")}</select></label>
       <label>最終アクション<input type="date" name="lastAction" value="${esc(c.lastAction || "")}"></label>
       <label>初任給（円）<input type="number" name="salary" inputmode="numeric" value="${esc(c.salary || "")}"></label>
-      <label>選考フロー（「、」区切り）<input name="flow" value="${esc((c.flow || []).join("、"))}" placeholder="ES、WEBテスト、一次面接、最終面接"></label>
+      <label>選考フロー（「、」区切り。路線図の駅になる）<input name="flow" value="${esc((c.flow || DEFAULT_FLOW).join("、"))}"></label>
 
       <h2 class="sec">マイページ</h2>
       <label>URL<input type="url" name="mpUrl" value="${esc(m.url || "")}" autocapitalize="off"></label>
@@ -544,7 +608,7 @@ function readForm(form) {
     name: get("name"),
     slug: get("slug"),
     industry: get("industry"),
-    status: get("status"),
+    track: get("track"),
     lastAction: get("lastAction"),
     salary: get("salary") ? Number(get("salary")) : null,
     flow: get("flow").split(/[、,，→]/).map((s) => s.trim()).filter(Boolean),
@@ -779,6 +843,7 @@ document.addEventListener("click", async (ev) => {
   if (!t) return;
   if (t.dataset.copy !== undefined) return copy(t.dataset.copy);
   if (t.dataset.done) return markDone(t.dataset.done);
+  if (t.dataset.state || t.dataset.step || t.dataset.pass) return statusClick(t);
   if (t.hasAttribute("data-reveal")) {
     const code = t.parentElement.querySelector(".cred-value");
     const hidden = code.classList.toggle("secret");
@@ -833,14 +898,35 @@ document.addEventListener("click", async (ev) => {
 document.addEventListener("change", async (ev) => {
   const t = ev.target;
   if (t.dataset.toggle) return markDone(t.dataset.toggle, t.checked);
-  if (t.dataset.status) {
-    const c = bySlug(t.dataset.status);
-    c.status = t.value;
-    c.lastAction = isoToday();
-    await saveCompanies(`${c.name}: ステータスを「${c.status}」に`);
-    render();
-  }
 });
+
+function statusClick(t) {
+  if (t.dataset.state) {
+    const [slug, next] = t.dataset.state.split(":");
+    const c = bySlug(slug);
+    if (stateOf(c) === next) return;
+    if (ENDED.has(next) && !confirm(`${c.name} を「${STATES[next].label}」にします。`)) return;
+    const note = next === "todo" && !LIVE_STATES.includes(stateOf(c)) ? "選考中に戻した" : `「${STATES[next].label}」にした`;
+    return updateStatus(c, { state: next }, note);
+  }
+  if (t.dataset.step) {
+    const [slug, i] = t.dataset.step.split(":");
+    const c = bySlug(slug);
+    const step = c.flow[Number(i)];
+    if (c.step === step) return;
+    const patch = { step };
+    if (!LIVE_STATES.includes(stateOf(c)) || stateOf(c) === "before") patch.state = "todo";
+    return updateStatus(c, patch, `段階を「${step}」にした`);
+  }
+  if (t.dataset.pass) {
+    const c = bySlug(t.dataset.pass);
+    const f = c.flow || [];
+    const idx = flowIndex(c);
+    if (idx < 0) return updateStatus(c, { step: f[0], state: "todo" }, "エントリーした");
+    if (idx + 1 < f.length) return updateStatus(c, { step: f[idx + 1], state: "todo" }, `${f[idx]}を通過した`);
+    return updateStatus(c, { state: "offer" }, `${f[idx]}を通過して内定`);
+  }
+}
 
 document.addEventListener("submit", async (ev) => {
   ev.preventDefault();
@@ -885,7 +971,7 @@ document.addEventListener("submit", async (ev) => {
       c = bySlug(slug);
     } else {
       if (bySlug(data.slug)) return toast(`識別名「${data.slug}」はもう使われています`, true);
-      c = { slug: data.slug };
+      c = { slug: data.slug, state: "before", history: [{ date: isoToday(), text: "追加した" }] };
       state.companies.push(c);
     }
     delete data.slug;
