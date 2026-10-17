@@ -21,6 +21,16 @@ const LIVE_STATES = ["before", "todo", "waiting"];
 const ENDED = new Set(["declined", "rejected"]);
 const TRACKS = ["本選考", "インターン"];
 const DEFAULT_FLOW = ["ES", "Webテスト", "一次面接", "最終面接"];
+const PRIORITIES = [
+  { v: 3, label: "第一志望群" },
+  { v: 2, label: "受けたい" },
+  { v: 1, label: "様子見" },
+  { v: 0, label: "未設定" },
+];
+const EVENT_KINDS = [
+  { v: "deadline", label: "締切（ES・Webテスト・エントリーなど）" },
+  { v: "event", label: "日程（面接・説明会・インターン当日など）" },
+];
 const WD = "日月火水木金土";
 const PAST_DAYS = 14;
 
@@ -36,6 +46,8 @@ const cfg = {
   token: store.get("jh.token"),
   repo: store.get("jh.repo") || DEFAULT_REPO,
 };
+
+const ui = { industry: store.get("jh.industry") || "" };
 
 const state = {
   companies: [],
@@ -223,11 +235,77 @@ function remainText(n) {
 }
 
 const urgency = (n) => (n <= 3 ? "urgent" : n <= 7 ? "soon" : "");
-const eventTitle = (e) => esc(e.title) + (e.tentative ? '<span class="tentative">目安</span>' : "");
+const eventTitle = (e) =>
+  (e.kind === "event" ? '<span class="kind">日程</span>' : "") + esc(e.title) + (e.tentative ? '<span class="tentative">目安</span>' : "");
+
+// ---------- カレンダー ----------
+
+// JST の日時を UTC の iCalendar 形式（20261030T010000Z）にする
+function utcStamp(date, time, addMinutes = 0) {
+  const [y, m, d] = date.split("-").map(Number);
+  const [hh, mm] = (time || "00:00").split(":").map(Number);
+  return new Date(Date.UTC(y, m - 1, d, hh - 9, mm + addMinutes)).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+}
+
+function nextDay(date) {
+  const d = parseDate(date);
+  d.setDate(d.getDate() + 1);
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+}
+
+const calTitle = (e, c) => `${e.kind === "event" ? "" : "【締切】"}${c.name} ${e.title}`;
+
+function googleCalUrl(e, c) {
+  const dates = e.time
+    ? `${utcStamp(e.date, e.time)}/${utcStamp(e.date, e.time, 30)}`
+    : `${e.date.replace(/-/g, "")}/${nextDay(e.date)}`;
+  const q = new URLSearchParams({ action: "TEMPLATE", text: calTitle(e, c), dates, details: whenText(e) });
+  return `https://calendar.google.com/calendar/render?${q}`;
+}
+
+function icsText(items) {
+  const escT = (t) => String(t).replace(/\\/g, "\\\\").replace(/[;,]/g, (m) => "\\" + m).replace(/\n/g, "\\n");
+  const now = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//shukatsu-board//JA", "CALSCALE:GREGORIAN"];
+  for (const { e, c } of items) {
+    lines.push(
+      "BEGIN:VEVENT",
+      `UID:${c.slug}-${e.date}-${(e.time || "").replace(":", "")}-${encodeURIComponent(e.title).slice(0, 40)}@shukatsu-board`,
+      `DTSTAMP:${now}`,
+      `SUMMARY:${escT(calTitle(e, c))}`,
+      `DESCRIPTION:${escT(whenText(e))}`,
+      ...(e.time
+        ? [`DTSTART:${utcStamp(e.date, e.time)}`, `DTEND:${utcStamp(e.date, e.time, 30)}`]
+        : [`DTSTART;VALUE=DATE:${e.date.replace(/-/g, "")}`, `DTEND;VALUE=DATE:${nextDay(e.date)}`]),
+      "BEGIN:VALARM",
+      "ACTION:DISPLAY",
+      `DESCRIPTION:${escT(calTitle(e, c))}`,
+      `TRIGGER:${e.kind === "event" ? "-PT2H" : "-P1D"}`,
+      "END:VALARM",
+      "END:VEVENT",
+    );
+  }
+  lines.push("END:VCALENDAR");
+  return lines.join("\r\n") + "\r\n";
+}
+
+function downloadIcs(name, items) {
+  const url = URL.createObjectURL(new Blob([icsText(items)], { type: "text/calendar;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
 
 // ---------- 企業 ----------
 
 const bySlug = (slug) => state.companies.find((c) => c.slug === slug);
+
+const priorityMark = (c) =>
+  c.priority ? `<span class="prio" title="志望度: ${PRIORITIES.find((p) => p.v === c.priority)?.label}">${"★".repeat(c.priority)}</span>` : "";
 
 const stateOf = (c) => (STATES[c.state] ? c.state : "before");
 const flowIndex = (c) => (c.flow || []).indexOf(c.step);
@@ -290,7 +368,7 @@ function viewSchedule() {
       : `<span class="next-num">${n}</span><span class="next-unit">日</span>`;
     html += `
       <section class="next ${urgency(n)}">
-        <p class="next-label">次の締切まで</p>
+        <p class="next-label">${head.kind === "event" ? "次の予定まで" : "次の締切まで"}</p>
         <div class="next-main">
           <div class="next-count">${count}</div>
           <div class="next-body">
@@ -310,7 +388,8 @@ function viewSchedule() {
     .filter((t) => t.n);
   html += `<a class="tally" href="#/companies">${tally
     .map((t) => `<span class="tally-item ${t.s}"><span class="tally-n">${t.n}</span>${STATES[t.s].label}</span>`)
-    .join("")}</a>`;
+    .join("")}</a>
+    <a class="btn ghost wide" href="#/add">予定を追加</a>`;
 
   if (rest.length) {
     html += `<h2 class="sec">この先の予定</h2><ol class="timetable">`;
@@ -367,34 +446,42 @@ function viewSchedule() {
 }
 
 function viewCompanies() {
-  // 締切が近い順、予定のない企業は名前順で後ろに
+  // 締切が近い順。予定のない企業は志望度の高い順、同じなら名前順
   const order = (a, b) => {
     const na = nextEvent(a);
     const nb = nextEvent(b);
     if (na && nb) return evKey(na).localeCompare(evKey(nb));
     if (na || nb) return na ? -1 : 1;
-    return a.name.localeCompare(b.name, "ja");
+    return (b.priority || 0) - (a.priority || 0) || a.name.localeCompare(b.name, "ja");
   };
+  const counts = {};
+  for (const c of state.companies) if (c.industry) counts[c.industry] = (counts[c.industry] || 0) + 1;
+  const industries = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+  const filter = industries.includes(ui.industry) ? ui.industry : "";
+  const pool = state.companies.filter((c) => !filter || c.industry === filter);
   const groups = [
     { s: "todo", label: "対応中" },
     { s: "waiting", label: "結果待ち" },
     { s: "offer", label: "内定" },
     { s: "before", label: "エントリー前" },
-  ].map((g) => ({ ...g, items: state.companies.filter((c) => stateOf(c) === g.s).sort(order) }));
-  const ended = state.companies.filter((c) => ENDED.has(stateOf(c)));
+  ].map((g) => ({ ...g, items: pool.filter((c) => stateOf(c) === g.s).sort(order) }));
+  const ended = pool.filter((c) => ENDED.has(stateOf(c)));
 
   const row = (c) => {
     const nx = nextEvent(c);
     return `
       <li><a class="co" href="#/c/${esc(c.slug)}">
-        <span class="co-name">${esc(c.name)}${c.track === "インターン" ? '<span class="track">インターン</span>' : ""}</span>
+        <span class="co-name">${esc(c.name)}${priorityMark(c)}${c.track === "インターン" ? '<span class="track">インターン</span>' : ""}</span>
         <span class="co-ind">${esc(c.industry || "")}</span>
         <span class="co-status">${routeMini(c)}${statusPill(c)}</span>
         ${nx ? `<span class="co-next ${urgency(daysUntil(nx.date))}">${esc(fmtDate(nx.date, otherYear(nx.date)))} ${esc(nx.title)}</span>` : ""}
       </a></li>`;
   };
 
-  let html = `<div class="list-head"><h1 class="page-title">企業</h1><a class="btn" href="#/new">企業を追加</a></div>`;
+  let html = `<div class="list-head"><h1 class="page-title">企業<span class="count">${pool.length}社</span></h1><a class="btn" href="#/new">企業を追加</a></div>
+    <div class="chips" role="group" aria-label="業界で絞り込む">
+      ${["", ...industries].map((i) => `<button data-filter="${esc(i)}" aria-pressed="${i === filter}">${i ? `${esc(i)}<span>${counts[i]}</span>` : "すべて"}</button>`).join("")}
+    </div>`;
   for (const g of groups) {
     if (!g.items.length) continue;
     html += `<h2 class="sec">${g.label}<span class="count">${g.items.length}社</span></h2><ul class="companies">${g.items.map(row).join("")}</ul>`;
@@ -476,20 +563,29 @@ function viewCompany(slug) {
 
   if (LIVE_STATES.includes(s)) {
     const next = idx >= 0 ? f[idx + 1] : f[0];
-    const passLabel = idx < 0 ? (f[0] ? `エントリーした（次は${f[0]}）` : "") : next ? `${f[idx]}を通過した（次は${next}）` : `${f[idx]}を通過した（内定）`;
+    const passLabel = idx < 0 ? (f[0] ? `選考を始める（${f[0]}から）` : "") : next ? `${f[idx]}を通過した（次は${next}）` : `${f[idx]}を通過した（内定）`;
     html += `<div class="outcomes">
       ${passLabel ? `<button class="btn primary wide" data-pass="${slug_}">${esc(passLabel)}</button>` : ""}
-      <div class="outcome-row">
+      ${s === "before" ? "" : `<div class="outcome-row">
         <button class="mini" data-state="${slug_}:offer">内定</button>
         <button class="mini" data-state="${slug_}:declined">辞退した</button>
         <button class="mini danger" data-state="${slug_}:rejected">不合格だった</button>
-      </div>
+      </div>`}
     </div>`;
+  }
+  if (s === "todo" && /面接/.test(c.step || "")) {
+    html += `<a class="btn ghost wide" href="#/doc/${encodeURIComponent("profile/08_面接想定問答.md")}">面接の想定問答を開く</a>`;
+  } else if (s === "todo" && /ES|書類|エントリー/.test(c.step || "")) {
+    html += `<a class="btn ghost wide" href="#/doc/${encodeURIComponent("profile/README.md")}">ESの素材を開く</a>`;
   }
   html += `</section>`;
 
   const mp = mypageBlock(c);
-  if (mp) html += `<h2 class="sec">マイページ</h2><div class="creds">${mp}</div>`;
+  html += `<h2 class="sec">マイページ</h2>`;
+  html += mp
+    ? `<div class="creds">${mp}</div>`
+    : `<p class="hint">まだ登録していません。登録したら URL・ID・パスワードを入れておくと、ログイン画面からすぐ開けます。</p>
+       <a class="btn ghost wide" href="#/c/${slug_}/edit">マイページ情報を入れる</a>`;
 
   const events = (c.events || []).map((e, i) => ({ ...e, i })).sort((a, b) => evKey(a).localeCompare(evKey(b)));
   html += `<h2 class="sec">予定</h2>`;
@@ -501,7 +597,8 @@ function viewCompany(slug) {
       html += `
         <li class="${e.done ? "done" : ""}">
           <label><input type="checkbox" data-toggle="${esc(c.slug)}:${e.i}"${e.done ? " checked" : ""}>
-          <span><span class="ck-when">${esc(whenText(e))}</span><span class="ck-title">${eventTitle(e)}</span></span></label>
+          <span><span class="ck-when">${esc(whenText(e))}</span><span class="ck-title">${eventTitle(e)}</span>
+          ${e.done ? "" : `<span class="cal-links"><button class="linkish" data-ics="${esc(c.slug)}:${e.i}">カレンダーに追加</button><a href="${esc(googleCalUrl(e, c))}" target="_blank" rel="noopener noreferrer">Googleカレンダー</a></span>`}</span></label>
           ${tail}
         </li>`;
     }
@@ -536,17 +633,18 @@ function viewCompany(slug) {
   return html;
 }
 
-function eventRow(e = {}) {
+function eventRow(e = {}, removable = true) {
   return `
     <fieldset class="ev">
       <input class="ev-title" name="title" placeholder="内容（例: ES提出締切）" value="${esc(e.title || "")}">
+      <label class="ev-kind">種類<select name="kind">${EVENT_KINDS.map((k) => `<option value="${k.v}"${k.v === (e.kind || "deadline") ? " selected" : ""}>${k.label}</option>`).join("")}</select></label>
       <label>日付（締切・当日）<input type="date" name="date" value="${esc(e.date || "")}"></label>
       <label>時刻<input type="time" name="time" value="${esc(e.time || "")}"></label>
       <label>開始日（期間のときだけ）<input type="date" name="start" value="${esc(e.start || "")}"></label>
       <label>開始時刻<input type="time" name="startTime" value="${esc(e.startTime || "")}"></label>
       <label class="check"><input type="checkbox" name="tentative"${e.tentative ? " checked" : ""}>日付は目安</label>
       <label class="check"><input type="checkbox" name="done"${e.done ? " checked" : ""}>済み</label>
-      <button type="button" class="mini danger" data-remove-ev>この予定を削除</button>
+      ${removable ? `<button type="button" class="mini danger" data-remove-ev>この予定を削除</button>` : ""}
     </fieldset>`;
 }
 
@@ -562,6 +660,7 @@ function viewEdit(slug) {
       <label>会社名<input name="name" required value="${esc(c.name || "")}"></label>
       ${isNew ? `<label>英字の識別名（ノートのファイル名になる。例: capcom）<input name="slug" required pattern="[a-z0-9-]+" autocapitalize="off"></label>` : ""}
       <label>業界・職種<input name="industry" value="${esc(c.industry || "")}"></label>
+      <label>志望度<select name="priority">${PRIORITIES.map((p) => `<option value="${p.v}"${p.v === (c.priority || 0) ? " selected" : ""}>${p.label}</option>`).join("")}</select></label>
       <label>選考の種類<select name="track">${TRACKS.map((t) => `<option${t === (c.track || "本選考") ? " selected" : ""}>${t}</option>`).join("")}</select></label>
       <label>最終アクション<input type="date" name="lastAction" value="${esc(c.lastAction || "")}"></label>
       <label>初任給（円）<input type="number" name="salary" inputmode="numeric" value="${esc(c.salary || "")}"></label>
@@ -596,6 +695,7 @@ function readForm(form) {
     .map((fs) => {
       const v = (n) => fs.querySelector(`[name="${n}"]`);
       const e = { title: v("title").value.trim(), date: v("date").value };
+      if (v("kind").value === "event") e.kind = "event";
       if (v("time").value) e.time = v("time").value;
       if (v("start").value) e.start = v("start").value;
       if (v("startTime").value) e.startTime = v("startTime").value;
@@ -609,6 +709,7 @@ function readForm(form) {
     slug: get("slug"),
     industry: get("industry"),
     track: get("track"),
+    priority: Number(get("priority")) || 0,
     lastAction: get("lastAction"),
     salary: get("salary") ? Number(get("salary")) : null,
     flow: get("flow").split(/[、,，→]/).map((s) => s.trim()).filter(Boolean),
@@ -624,6 +725,23 @@ function readForm(form) {
   };
 }
 
+function viewAddEvent() {
+  const options = [...state.companies]
+    .filter((c) => !ENDED.has(stateOf(c)))
+    .sort((a, b) => a.name.localeCompare(b.name, "ja"))
+    .map((c) => `<option value="${esc(c.slug)}">${esc(c.name)}</option>`)
+    .join("");
+  return `
+    <a class="back" href="#/schedule">予定</a>
+    <h1 class="page-title">予定を追加</h1>
+    <form id="addev">
+      <label>企業<select name="company" required><option value="">選んでください</option>${options}</select></label>
+      ${eventRow({}, false)}
+      <button class="btn primary wide" type="submit">追加する</button>
+      <p class="hint">ここにない企業は、先に「企業」タブの「企業を追加」から登録してください。</p>
+    </form>`;
+}
+
 function viewLogins() {
   const list = [...state.companies]
     .filter((c) => c.mypage && (c.mypage.url || c.mypage.id || c.mypage.password))
@@ -632,7 +750,18 @@ function viewLogins() {
   for (const c of list) {
     html += `<li><a class="login-name" href="#/c/${esc(c.slug)}">${esc(c.name)}</a><div class="creds">${mypageBlock(c)}</div></li>`;
   }
-  return html + `</ul>`;
+  html += `</ul>`;
+  const missing = state.companies
+    .filter((c) => !list.includes(c) && !ENDED.has(stateOf(c)))
+    .sort((a, b) => (b.priority || 0) - (a.priority || 0) || a.name.localeCompare(b.name, "ja"));
+  if (missing.length) {
+    html += `<h2 class="sec">マイページ未登録<span class="count">${missing.length}社</span></h2>
+      <p class="hint">登録したら「入力する」から URL・ID・パスワードを入れてください。</p>
+      <ul class="unregistered">${missing
+        .map((c) => `<li><a href="#/c/${esc(c.slug)}">${esc(c.name)}</a>${priorityMark(c)}<span class="co-ind">${esc(c.industry || "")}</span><a class="mini" href="#/c/${esc(c.slug)}/edit">入力する</a></li>`)
+        .join("")}</ul>`;
+  }
+  return html;
 }
 
 function docName(path) {
@@ -711,6 +840,9 @@ function viewSettings() {
       <label>GitHub トークン（変更するときだけ入力）<input name="token" type="password" autocomplete="off" placeholder="github_pat_…"></label>
       <button class="btn primary wide" type="submit">保存して読み込み直す</button>
     </form>
+    <h2 class="sec">カレンダーに書き出す</h2>
+    <p class="hint">これからの予定（済みを除く）を .ics ファイルにまとめます。iPhone は開くとカレンダーに追加でき、Googleカレンダーは PC の「設定 → インポート」から取り込めます。締切は前日、日程は2時間前に通知が出ます。</p>
+    <button class="btn wide" data-ics-all>まとめて書き出す</button>
     <h2 class="sec">この端末から消す</h2>
     <p class="hint">トークンと、端末に残っている企業データのコピーを削除します。スマホを手放すときや、共用のPCで使ったあとに。</p>
     <button class="btn danger wide" data-logout>この端末からログアウト</button>`;
@@ -745,7 +877,7 @@ function route() {
 
 function renderChrome() {
   const [name] = route();
-  const tab = { c: "companies", new: "companies", doc: "docs" }[name] || name;
+  const tab = { c: "companies", new: "companies", doc: "docs", add: "schedule" }[name] || name;
   document.querySelectorAll(".tabs a").forEach((a) => a.toggleAttribute("aria-current", a.dataset.tab === tab));
   const d = today();
   document.getElementById("today").textContent = `${d.getMonth() + 1}/${d.getDate()}(${WD[d.getDay()]})`;
@@ -772,6 +904,7 @@ async function render() {
     else if (name === "c") html = viewCompany(arg);
     else if (name === "new") html = viewEdit(null);
     else if (name === "logins") html = viewLogins();
+    else if (name === "add") html = viewAddEvent();
     else if (name === "docs") html = viewDocs();
     else if (name === "settings") html = viewSettings();
     else if (name === "doc") {
@@ -844,6 +977,23 @@ document.addEventListener("click", async (ev) => {
   if (t.dataset.copy !== undefined) return copy(t.dataset.copy);
   if (t.dataset.done) return markDone(t.dataset.done);
   if (t.dataset.state || t.dataset.step || t.dataset.pass) return statusClick(t);
+  if (t.dataset.filter !== undefined) {
+    ui.industry = t.dataset.filter;
+    store.set("jh.industry", ui.industry);
+    return render();
+  }
+  if (t.dataset.ics) {
+    const [slug, i] = t.dataset.ics.split(":");
+    const c = bySlug(slug);
+    const e = c.events[Number(i)];
+    return downloadIcs(`${c.slug}-${e.date}.ics`, [{ e, c }]);
+  }
+  if (t.hasAttribute("data-ics-all")) {
+    const items = allEvents().filter((e) => !e.done && daysUntil(e.date) >= 0 && !ENDED.has(e.c.state)).map((e) => ({ e, c: e.c }));
+    if (!items.length) return toast("書き出す予定がありません", true);
+    downloadIcs(`shukatsu-${isoToday()}.ics`, items);
+    return toast(`${items.length}件の予定を書き出しました`);
+  }
   if (t.hasAttribute("data-reveal")) {
     const code = t.parentElement.querySelector(".cred-value");
     const hidden = code.classList.toggle("secret");
@@ -922,7 +1072,7 @@ function statusClick(t) {
     const c = bySlug(t.dataset.pass);
     const f = c.flow || [];
     const idx = flowIndex(c);
-    if (idx < 0) return updateStatus(c, { step: f[0], state: "todo" }, "エントリーした");
+    if (idx < 0) return updateStatus(c, { step: f[0], state: "todo" }, `選考を始めた（${f[0]}）`);
     if (idx + 1 < f.length) return updateStatus(c, { step: f[idx + 1], state: "todo" }, `${f[idx]}を通過した`);
     return updateStatus(c, { state: "offer" }, `${f[idx]}を通過して内定`);
   }
@@ -979,6 +1129,18 @@ document.addEventListener("submit", async (ev) => {
     if (!c.salary) delete c.salary;
     button.disabled = true;
     if (await saveCompanies(`${c.name} を${slug ? "更新" : "追加"}`)) location.hash = `#/c/${c.slug}`;
+    button.disabled = false;
+    return;
+  }
+
+  if (form.id === "addev") {
+    const c = bySlug(form.company.value);
+    const [e] = readForm(form).events;
+    if (!c) return toast("企業を選んでください", true);
+    if (!e?.title || !e?.date) return toast("内容と日付の両方を入れてください", true);
+    c.events = [...(c.events || []), e];
+    button.disabled = true;
+    if (await saveCompanies(`${c.name}: 予定「${e.title}」を追加`)) location.hash = "#/schedule";
     button.disabled = false;
     return;
   }

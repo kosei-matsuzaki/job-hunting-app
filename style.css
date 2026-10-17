@@ -695,3 +695,74 @@ input:focus, select:focus, textarea:focus { border-color: var(--line); outline: 
   .toast { transition: none; }
   .icon-btn.spinning svg { animation: none; }
 }
+
+/* ---------- 志望度・絞り込み・予定の種類 ---------- */
+
+.prio { margin-left: 6px; color: #c99700; font-size: 0.8125rem; letter-spacing: -0.05em; vertical-align: 1px; }
+.page-title .count { margin-left: 10px; font-size: 0.875rem; font-weight: 400; color: var(--muted); }
+
+.chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin: 4px calc(var(--gutter) * -1) 0;
+  padding: 4px var(--gutter) 8px;
+  scrollbar-width: none;
+}
+.chips::-webkit-scrollbar { display: none; }
+.chips button {
+  flex: none;
+  min-height: 34px;
+  padding: 2px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+.chips button span { margin-left: 6px; color: var(--muted); font-size: 0.75rem; }
+.chips button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.chips button[aria-pressed="true"] span { color: inherit; opacity: 0.7; }
+
+.kind {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--line-soft);
+  color: var(--line);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  vertical-align: 2px;
+}
+.next .kind { background: rgb(255 255 255 / 0.15); color: inherit; }
+
+.cal-links { display: flex; gap: 14px; margin-top: 2px; font-size: 0.8125rem; }
+.linkish {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--line);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.ev .ev-kind { grid-column: 1 / -1; }
+
+.unregistered { list-style: none; margin: 0; padding: 0; }
+.unregistered li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.unregistered li > a:first-child { color: var(--ink); font-weight: 700; text-decoration: none; }
+.unregistered .co-ind { margin-left: auto; }
+.unregistered .mini { display: inline-flex; align-items: center; text-decoration: none; color: var(--line); }
+
+.tally + .btn.wide { margin-top: 12px; }
