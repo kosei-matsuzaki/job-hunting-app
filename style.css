@@ -766,3 +766,22 @@ input:focus, select:focus, textarea:focus { border-color: var(--line); outline: 
 .unregistered .mini { display: inline-flex; align-items: center; text-decoration: none; color: var(--line); }
 
 .tally + .btn.wide { margin-top: 12px; }
+
+.offline {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--line-soft);
+  color: var(--line);
+  font-size: 0.875rem;
+}
+
+/* ---------- 検索 ---------- */
+
+.search-box { width: 100%; margin: 4px 0 8px; }
+.results { list-style: none; margin: 0; padding: 0; }
+.results li { padding: 10px 0; border-bottom: 1px solid var(--rule); }
+.results li > a { font-weight: 700; color: var(--ink); text-decoration: none; }
+.results .co-ind { margin-left: 8px; }
+.results p { margin: 2px 0 0; color: var(--muted); font-size: 0.875rem; line-height: 1.55; }
+mark { background: color-mix(in srgb, var(--signal) 45%, transparent); color: inherit; border-radius: 2px; padding: 0 1px; }

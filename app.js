@@ -47,7 +47,7 @@ const cfg = {
   repo: store.get("jh.repo") || DEFAULT_REPO,
 };
 
-const ui = { industry: store.get("jh.industry") || "" };
+const ui = { industry: store.get("jh.industry") || "", q: "" };
 
 const state = {
   companies: [],
@@ -158,40 +158,74 @@ async function loadCompanies() {
     saveCache();
   } catch (e) {
     state.error = explain(e);
+    state.offline = e instanceof TypeError && state.loaded;
   } finally {
     state.loading = false;
   }
 }
 
-async function saveCompanies(message) {
-  const text = JSON.stringify({ companies: state.companies }, null, 2) + "\n";
-  try {
-    state.sha = await writeFile(DATA_PATH, text, state.sha, message);
-    saveCache();
-    toast("保存しました");
-    return true;
-  } catch (e) {
-    if (e.status === 409 || e.status === 422) {
-      await loadCompanies();
+// 変更を当てて保存する。別の端末が先に保存していたら、最新を読み直して同じ変更を当て直す。
+// apply は state.companies を slug で引いて書き換える関数（何度呼ばれても同じ結果になるように書く）
+async function commit(apply, message) {
+  const snapshot = JSON.stringify(state.companies);
+  apply();
+  render();
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const text = JSON.stringify({ companies: state.companies }, null, 2) + "\n";
+      state.sha = await writeFile(DATA_PATH, text, state.sha, message);
+      saveCache();
+      toast(attempt ? "別の端末の変更と合わせて保存しました" : "保存しました");
+      return true;
+    } catch (err) {
+      let e = err;
+      if ((e.status === 409 || e.status === 422) && attempt < 2) {
+        try {
+          const latest = await readFile(DATA_PATH);
+          state.companies = JSON.parse(latest.text).companies || [];
+          state.sha = latest.sha;
+          apply();
+          continue;
+        } catch (reloadError) {
+          e = reloadError;
+        }
+      }
+      state.companies = JSON.parse(snapshot);
       render();
-      toast("別の端末で更新されていたため、最新の内容を読み込み直しました。もう一度操作してください。", true);
-    } else {
-      toast(explain(e), true);
+      toast(`${explain(e)}（変更は保存されていません）`, true);
+      return false;
     }
-    return false;
   }
 }
 
+// 素材は一度開いたら端末に残し、電波がないときはそれを出す
+const DOC_KEY = "jh.doc:";
+
 async function loadDocList() {
-  const groups = await Promise.all(DOC_GROUPS.map(async (g) => ({ ...g, paths: await listDocs(g.dir) })));
-  state.docs = groups;
+  try {
+    state.docs = await Promise.all(DOC_GROUPS.map(async (g) => ({ ...g, paths: await listDocs(g.dir) })));
+    store.set("jh.doclist", JSON.stringify(state.docs));
+  } catch (e) {
+    const cached = store.get("jh.doclist");
+    if (!cached) throw e;
+    state.docs = JSON.parse(cached);
+  }
 }
 
 async function getDoc(path, fresh = false) {
   if (!fresh && state.docCache.has(path)) return state.docCache.get(path);
-  const doc = await readFile(path);
-  state.docCache.set(path, doc);
-  return doc;
+  try {
+    const doc = await readFile(path);
+    state.docCache.set(path, doc);
+    store.set(DOC_KEY + path, JSON.stringify(doc));
+    return doc;
+  } catch (e) {
+    const cached = store.get(DOC_KEY + path);
+    if (e.status || !cached) throw e;
+    const doc = { ...JSON.parse(cached), offline: true };
+    state.docCache.set(path, doc);
+    return doc;
+  }
 }
 
 // ---------- 日付 ----------
@@ -319,11 +353,14 @@ function statusPill(c) {
 
 // 状況を変えて、記録を残して保存する
 async function updateStatus(c, patch, note) {
-  Object.assign(c, patch);
-  c.lastAction = isoToday();
-  c.history = [{ date: isoToday(), text: note }, ...(c.history || [])];
-  render();
-  await saveCompanies(`${c.name}: ${note}`);
+  const { slug, name } = c;
+  await commit(() => {
+    const x = bySlug(slug);
+    if (!x) return;
+    Object.assign(x, patch);
+    x.lastAction = isoToday();
+    x.history = [{ date: isoToday(), text: note }, ...(x.history || [])];
+  }, `${name}: ${note}`);
   render();
 }
 
@@ -832,6 +869,91 @@ function viewDocEdit(path, doc) {
     </form>`;
 }
 
+// ---------- 検索 ----------
+
+function highlight(text, terms) {
+  let html = esc(text);
+  for (const t of terms) {
+    const re = new RegExp(esc(t).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+    html = html.replace(re, (m) => `<mark>${m}</mark>`);
+  }
+  return html;
+}
+
+function snippet(text, term, width = 40) {
+  const i = text.toLowerCase().indexOf(term.toLowerCase());
+  if (i < 0) return text.slice(0, width * 2);
+  const from = Math.max(0, i - width);
+  return (from > 0 ? "…" : "") + text.slice(from, i + term.length + width).replace(/\s+/g, " ") + (i + term.length + width < text.length ? "…" : "");
+}
+
+function searchResults(q) {
+  const terms = q.trim().split(/\s+/).filter(Boolean);
+  if (!terms.length) return `<p class="hint">企業名・業界・メモ・予定・ESの文章をまとめて探せます。スペースで区切ると、すべてを含むものだけに絞ります。</p>`;
+  const hit = (text) => terms.every((t) => text.toLowerCase().includes(t.toLowerCase()));
+
+  const companies = state.companies.filter((c) =>
+    hit([c.name, c.industry, c.step, STATES[stateOf(c)].label, c.memo, ...(c.todo || []), ...(c.flow || [])].join("\n")),
+  );
+  const events = allEvents().filter((e) => hit(`${e.c.name} ${e.title}`)).sort((a, b) => evKey(a).localeCompare(evKey(b)));
+  const docs = [];
+  for (const [path, doc] of state.docCache) {
+    const lines = doc.text.split("\n").filter((l) => l.trim() && hit(l));
+    if (lines.length || hit(docName(path))) docs.push({ path, lines });
+  }
+
+  let html = "";
+  if (companies.length) {
+    html += `<h2 class="sec">企業<span class="count">${companies.length}</span></h2><ul class="results">`;
+    html += companies
+      .map((c) => {
+        const where = [c.memo, ...(c.todo || [])].find((t) => t && terms.some((x) => t.toLowerCase().includes(x.toLowerCase())));
+        return `<li><a href="#/c/${esc(c.slug)}">${highlight(c.name, terms)}</a><span class="co-ind">${esc(c.industry || "")}</span>${where ? `<p>${highlight(snippet(where, terms[0]), terms)}</p>` : ""}</li>`;
+      })
+      .join("");
+    html += `</ul>`;
+  }
+  if (events.length) {
+    html += `<h2 class="sec">予定<span class="count">${events.length}</span></h2><ul class="results">`;
+    html += events
+      .map((e) => `<li><a href="#/c/${esc(e.c.slug)}">${esc(e.c.name)}</a><p>${esc(fmtDate(e.date, otherYear(e.date)))} ${highlight(e.title, terms)}${e.done ? "（済み）" : ""}</p></li>`)
+      .join("");
+    html += `</ul>`;
+  }
+  if (docs.length) {
+    html += `<h2 class="sec">素材・ノート<span class="count">${docs.length}</span></h2><ul class="results">`;
+    html += docs
+      .map((d) => `<li><a href="#/doc/${encodeURIComponent(d.path)}">${highlight(docName(d.path), terms)}</a>${d.lines
+        .slice(0, 3)
+        .map((l) => `<p>${highlight(snippet(l.replace(/^[#>\-*\s|]+/, ""), terms[0]), terms)}</p>`)
+        .join("")}</li>`)
+      .join("");
+    html += `</ul>`;
+  }
+  if (!html) html = `<p class="empty">「${esc(q)}」に当てはまるものはありません。</p>`;
+  if (state.docsLoading) html += `<p class="hint">素材を読み込み中…</p>`;
+  return html;
+}
+
+function viewSearch() {
+  return `
+    <h1 class="page-title">検索</h1>
+    <input id="q" class="search-box" type="search" enterkeyhint="search" placeholder="例: 面接　/　Go　/　締切" value="${esc(ui.q)}">
+    <div id="results">${searchResults(ui.q)}</div>`;
+}
+
+// 検索のために、まだ開いていない素材もまとめて読み込む
+async function loadAllDocs() {
+  if (state.docsLoading || !state.docs) return;
+  const paths = [...state.docs.flatMap((g) => g.paths), ...EXTRA_DOCS.map((d) => d.path)].filter((p) => !state.docCache.has(p));
+  if (!paths.length) return;
+  state.docsLoading = true;
+  await Promise.all(paths.map((p) => getDoc(p).catch(() => null)));
+  state.docsLoading = false;
+  const box = document.getElementById("results");
+  if (box) box.innerHTML = searchResults(ui.q);
+}
+
 function viewSettings() {
   return `
     <h1 class="page-title">設定</h1>
@@ -905,6 +1027,7 @@ async function render() {
     else if (name === "new") html = viewEdit(null);
     else if (name === "logins") html = viewLogins();
     else if (name === "add") html = viewAddEvent();
+    else if (name === "search") html = viewSearch();
     else if (name === "docs") html = viewDocs();
     else if (name === "settings") html = viewSettings();
     else if (name === "doc") {
@@ -916,9 +1039,22 @@ async function render() {
   } catch (e) {
     html = `<p class="error">${esc(explain(e))}</p>`;
   }
-  if (state.error) html = `<p class="error">${esc(state.error)}</p>` + html;
+  if (state.error) {
+    html = state.offline
+      ? `<p class="offline">電波がないため、前回読み込んだ内容を表示しています。変更は保存できません。</p>` + html
+      : `<p class="error">${esc(state.error)}</p>` + html;
+  }
   view.innerHTML = html;
   if (name === "doc" && sub === "edit") bindDocCounter();
+  if (name === "search") {
+    const box = document.getElementById("q");
+    box.addEventListener("input", () => {
+      ui.q = box.value;
+      document.getElementById("results").innerHTML = searchResults(ui.q);
+    });
+    if (!ui.q) box.focus();
+    loadAllDocs();
+  }
 }
 
 function bindDocCounter() {
@@ -962,12 +1098,16 @@ async function copy(text) {
 async function markDone(key, done = true) {
   const [slug, i] = key.split(":");
   const c = bySlug(slug);
-  const e = c?.events?.[Number(i)];
-  if (!e) return;
-  e.done = done;
-  if (!done) delete e.done;
-  render();
-  await saveCompanies(`${c.name}: ${e.title} を${done ? "済み" : "未完了"}に`);
+  const target = c?.events?.[Number(i)];
+  if (!target) return;
+  const { title, date } = target;
+  await commit(() => {
+    // 別の端末で予定が増減しても同じ予定を指すよう、内容と日付で探す
+    const e = bySlug(slug)?.events?.find((x) => x.title === title && x.date === date);
+    if (!e) return;
+    if (done) e.done = true;
+    else delete e.done;
+  }, `${c.name}: ${title} を${done ? "済み" : "未完了"}に`);
   render();
 }
 
@@ -1010,8 +1150,10 @@ document.addEventListener("click", async (ev) => {
   if (t.dataset.delete) {
     const c = bySlug(t.dataset.delete);
     if (!confirm(`${c.name} を削除します。予定・ログイン情報・メモも消えます。`)) return;
-    state.companies = state.companies.filter((x) => x !== c);
-    if (await saveCompanies(`${c.name} を削除`)) location.hash = "#/companies";
+    const slug = c.slug;
+    if (await commit(() => { state.companies = state.companies.filter((x) => x.slug !== slug); }, `${c.name} を削除`)) {
+      location.hash = "#/companies";
+    }
     return;
   }
   if (t.dataset.newnote) {
@@ -1039,7 +1181,10 @@ document.addEventListener("click", async (ev) => {
   }
   if (t.hasAttribute("data-logout")) {
     if (!confirm("この端末からトークンとデータのコピーを削除します。")) return;
-    ["jh.token", "jh.cache", "jh.repo"].forEach((k) => store.del(k));
+    ["jh.token", "jh.cache", "jh.repo", "jh.doclist", "jh.industry"].forEach((k) => store.del(k));
+    try {
+      Object.keys(localStorage).filter((k) => k.startsWith(DOC_KEY)).forEach((k) => store.del(k));
+    } catch { /* noop */ }
     location.hash = "";
     location.reload();
   }
@@ -1115,20 +1260,21 @@ document.addEventListener("submit", async (ev) => {
   if (form.id === "edit") {
     const data = readForm(form);
     if (data.events.some((e) => !e.date || !e.title)) return toast("予定には内容と日付の両方を入れてください", true);
-    const slug = form.dataset.slug;
-    let c;
-    if (slug) {
-      c = bySlug(slug);
-    } else {
-      if (bySlug(data.slug)) return toast(`識別名「${data.slug}」はもう使われています`, true);
-      c = { slug: data.slug, state: "before", history: [{ date: isoToday(), text: "追加した" }] };
-      state.companies.push(c);
-    }
+    const slug = form.dataset.slug || data.slug;
+    const isNew = !form.dataset.slug;
+    if (isNew && bySlug(slug)) return toast(`識別名「${slug}」はもう使われています`, true);
     delete data.slug;
-    Object.assign(c, data);
-    if (!c.salary) delete c.salary;
     button.disabled = true;
-    if (await saveCompanies(`${c.name} を${slug ? "更新" : "追加"}`)) location.hash = `#/c/${c.slug}`;
+    const saved = await commit(() => {
+      let c = bySlug(slug);
+      if (!c) {
+        c = { slug, state: "before", history: [{ date: isoToday(), text: "追加した" }] };
+        state.companies.push(c);
+      }
+      Object.assign(c, structuredClone(data));
+      if (!c.salary) delete c.salary;
+    }, `${data.name} を${isNew ? "追加" : "更新"}`);
+    if (saved) location.hash = `#/c/${slug}`;
     button.disabled = false;
     return;
   }
@@ -1138,9 +1284,13 @@ document.addEventListener("submit", async (ev) => {
     const [e] = readForm(form).events;
     if (!c) return toast("企業を選んでください", true);
     if (!e?.title || !e?.date) return toast("内容と日付の両方を入れてください", true);
-    c.events = [...(c.events || []), e];
+    const slug = c.slug;
     button.disabled = true;
-    if (await saveCompanies(`${c.name}: 予定「${e.title}」を追加`)) location.hash = "#/schedule";
+    const saved = await commit(() => {
+      const x = bySlug(slug);
+      if (x && !x.events?.some((y) => y.title === e.title && y.date === e.date)) x.events = [...(x.events || []), { ...e }];
+    }, `${c.name}: 予定「${e.title}」を追加`);
+    if (saved) location.hash = "#/schedule";
     button.disabled = false;
     return;
   }
@@ -1171,6 +1321,15 @@ window.addEventListener("hashchange", () => {
 });
 
 // ---------- 起動 ----------
+
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  navigator.serviceWorker.register("sw.js").catch(() => { /* なくても動く */ });
+}
+window.addEventListener("online", async () => {
+  if (!state.offline) return;
+  await loadCompanies();
+  render();
+});
 
 (async function start() {
   if (!cfg.token) return render();
