@@ -26,6 +26,7 @@
   --ai: #7550d8;
   --consult: #3b72b9;
   --maker: #b7791f;
+  --sier: #b83280;
   --other: #6b7280;
   --intern: #0e8c86;
   --early: #a86400;
@@ -319,6 +320,7 @@ main { max-width: 680px; margin: 0 auto; padding: 4px var(--gutter) 0; }
 .avatar.ai, .ind-dot.ai { --c: var(--ai); }
 .avatar.consult, .ind-dot.consult { --c: var(--consult); }
 .avatar.maker, .ind-dot.maker { --c: var(--maker); }
+.avatar.sier, .ind-dot.sier { --c: var(--sier); }
 .ind-dot { --c: var(--other); display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c); margin-right: 6px; }
 
 /* 選考の種類・状況 */
