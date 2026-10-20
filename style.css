@@ -977,3 +977,93 @@ fieldset [data-remove-fs] { grid-column: 1 / -1; justify-self: end; margin-top: 
   .icon-btn.spinning svg { animation: none; }
   .qa:active { transform: none; }
 }
+
+
+/* ---------- UI改善（元に戻す・目次・読み込み中など） ---------- */
+
+.toast { display: flex; align-items: center; gap: 14px; }
+.toast.actionable { pointer-events: auto; }
+.toast-btn {
+  flex: none;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--bg) 40%, transparent);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--signal);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sec-hint { margin: -4px 0 4px; font-size: 0.75rem; }
+.open-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--ok);
+}
+.open-dot::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+
+.prog-next {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 0.875rem;
+}
+.prog-next b { font-size: 0.75rem; color: var(--muted); }
+.prog-next span { margin-left: auto; font-size: 0.75rem; font-weight: 700; }
+.prog-next.urgent span { color: var(--alert); }
+.prog-next.soon span { color: var(--soon); }
+
+.toc {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  margin: 6px calc(var(--gutter) * -1) 4px;
+  padding: 4px var(--gutter) 8px;
+  scrollbar-width: none;
+}
+.toc::-webkit-scrollbar { display: none; }
+.toc button {
+  flex: none;
+  max-width: 220px;
+  padding: 4px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.toc button.sub { color: var(--muted); }
+.md [id^="h-"], .sec-head[id] { scroll-margin-top: 64px; }
+.md td:first-child, .md th:first-child { min-width: 5.5em; }
+
+.week-empty { margin: 0 0 8px; text-align: center; }
+.fab-space { height: 72px; }
+
+.error-panel { padding-top: 12px; }
+.skeleton { display: grid; gap: 12px; padding-top: 12px; }
+.skeleton i {
+  display: block;
+  height: 64px;
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, var(--surface-2), var(--surface), var(--surface-2));
+  background-size: 200% 100%;
+  animation: shimmer 1.2s ease-in-out infinite;
+}
+.skeleton i:first-child { height: 150px; background-color: var(--board); }
+@keyframes shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .skeleton i { animation: none; } }

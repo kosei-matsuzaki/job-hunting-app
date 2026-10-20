@@ -212,6 +212,7 @@ async function loadCompanies() {
     state.companies = (JSON.parse(text).companies || []).map(normalize);
     state.sha = sha;
     state.loaded = true;
+    state.loadedAt = Date.now();
     state.error = null;
     state.offline = false;
     saveCache();
@@ -225,7 +226,7 @@ async function loadCompanies() {
 
 // 変更を当てて保存する。別の端末が先に保存していたら、最新を読み直して同じ変更を当て直す。
 // apply は state.companies を slug で引いて書き換える関数（何度呼ばれても同じ結果になるように書く）
-async function commit(apply, message) {
+async function commit(apply, message, { quiet = false } = {}) {
   const snapshot = JSON.stringify(state.companies);
   apply();
   render();
@@ -234,8 +235,8 @@ async function commit(apply, message) {
       const text = JSON.stringify({ companies: state.companies }, null, 2) + "\n";
       state.sha = await writeFile(DATA_PATH, text, state.sha, message);
       saveCache();
-      toast(attempt ? "別の端末の変更と合わせて保存しました" : "保存しました");
-      return true;
+      if (!quiet || attempt) toast(attempt ? "別の端末の変更と合わせて保存しました" : "保存しました");
+      return attempt ? MERGED : true;
     } catch (err) {
       let e = err;
       if ((e.status === 409 || e.status === 422) && attempt < 2) {
@@ -411,8 +412,10 @@ function progChips(progs) {
   const active = progs.filter((p) => p.state !== "before");
   const waitingKinds = {};
   for (const p of progs.filter((q) => q.state === "before")) waitingKinds[p.kind] = (waitingKinds[p.kind] || 0) + 1;
+  const open = progs.some((p) => p.state === "before" && p.status === "受付中");
   return (
     active.map(progChip).join("") +
+    (open ? '<span class="open-dot">受付中</span>' : "") +
     Object.entries(waitingKinds)
       .map(([k, n]) => `<span class="prog-chip before">${kindBadge(k)}${n > 1 ? `<span>×${n}</span>` : ""}</span>`)
       .join("")
@@ -575,7 +578,9 @@ function viewHome() {
   }
   html += `</ol>`;
 
-  if (week.length) {
+  if (!week.length) {
+    html += `<p class="hint week-empty">今週の予定はありません。</p>`;
+  } else {
     html += `<section class="sheet agenda">`;
     for (const [iso, evs] of groupByDay(week)) {
       html += `<h2 class="day-head ${urgency(daysUntil(iso))}">${esc(dayLabel(iso))}</h2><ul class="ev-list">${evs.map((e) => eventRow(e)).join("")}</ul>`;
@@ -689,7 +694,7 @@ function viewCalendar(sel) {
       .map((e) => eventRow(e, { date: true }))
       .join("")}</ul>`;
   }
-  html += `<a class="fab" href="#/add/${selected}" aria-label="予定を追加">${ICONS.plus}</a>`;
+  html += `<div class="fab-space"></div><a class="fab" href="#/add/${selected}" aria-label="予定を追加">${ICONS.plus}</a>`;
   return html;
 }
 
@@ -725,16 +730,20 @@ function companyRows() {
         </span>
       </a></li>`;
   };
+  const canApply = (c) => c.programs.some((p) => p.state === "before" && p.status === "受付中");
   const groups = [
-    { s: "todo", label: "対応中" },
-    { s: "waiting", label: "結果待ち" },
-    { s: "offer", label: "内定" },
-    { s: "before", label: "エントリー前" },
+    { label: "対応中", hint: "", test: (c) => companyState(c) === "todo" },
+    { label: "結果待ち", hint: "", test: (c) => companyState(c) === "waiting" },
+    { label: "内定", hint: "", test: (c) => companyState(c) === "offer" },
+    { label: "応募できる", hint: "受付中のルートがあり、まだ応募していない企業", test: (c) => companyState(c) === "before" && canApply(c) },
+    { label: "まだ受付前", hint: "", test: (c) => companyState(c) === "before" && !canApply(c) },
   ];
   let html = "";
   for (const g of groups) {
-    const items = pool.filter((c) => companyState(c) === g.s).sort(order);
-    if (items.length) html += `<h2 class="sec">${g.label}<span class="count">${items.length}</span></h2><ul class="co-list">${items.map(row).join("")}</ul>`;
+    const items = pool.filter(g.test).sort(order);
+    if (items.length) {
+      html += `<h2 class="sec">${g.label}<span class="count">${items.length}</span></h2>${g.hint ? `<p class="hint sec-hint">${g.hint}</p>` : ""}<ul class="co-list">${items.map(row).join("")}</ul>`;
+    }
   }
   const ended = pool.filter(isEnded);
   if (ended.length) html += `<details class="ended"><summary>終了した企業<span class="count">${ended.length}</span></summary><ul class="co-list">${ended.map(row).join("")}</ul></details>`;
@@ -777,6 +786,11 @@ function programPanel(c, p) {
         ${p.status && p.status !== "不明" ? `<span class="open ${p.status === "受付中" ? "on" : ""}">${esc(p.status)}</span>` : ""}
       </div>
       ${p.period ? `<p class="prog-period">受付・時期: ${esc(p.period)}</p>` : ""}`;
+  const nx = nextEvent(c, p.id);
+  if (nx) {
+    const n = daysUntil(nx.date);
+    html += `<p class="prog-next ${urgency(n)}"><b>次の予定</b>${esc(fmtDate(nx.date))}${nx.time ? ` ${esc(nx.time)}` : ""} ${esc(nx.title)}<span>${esc(remainText(n))}</span></p>`;
+  }
 
   if (ENDED.has(s) || s === "offer") {
     html += `<div class="state-final">${statePill(s)}<span>${p.step ? `${esc(p.step)}まで進みました` : ""}</span>
@@ -1083,6 +1097,7 @@ function viewLogins() {
   let html = `
     <header class="page-head"><h1 class="page-title">ログイン</h1>
     <p class="page-sub">パスワードは伏せたままコピーできます。押すと表示します。</p></header>
+    <input id="lq" class="search-box" type="search" placeholder="企業名で探す" enterkeyhint="search">
     <ul class="login-list">`;
   for (const c of withLogin) {
     const m = c.mypage;
@@ -1152,22 +1167,34 @@ function viewDoc(path, doc) {
     if (b.type === "h" && b.level >= 2) sections.push({ head: b, blocks: [] });
     else sections[sections.length - 1].blocks.push(b);
   }
+  // 目次: 見出しが多い素材だけ。押すとその見出しまで移動する
+  // 大見出し（##）が3つ以上あれば大見出しだけ、なければ小見出し（###）まで
+  const top = sections.filter((s) => s.head && s.head.level === 2);
+  const heads = top.length >= 3 ? top : sections.filter((s) => s.head && s.head.level <= 3);
+  const toc = heads.length >= 3
+    ? `<nav class="toc" aria-label="目次">${heads
+        .map((s, i) => `<button class="${s.head.level === 3 ? "sub" : ""}" data-jump="h-${i}">${esc(s.head.text.replace(/（\d+字）$/, ""))}</button>`)
+        .join("")}</nav>`
+    : "";
   let html = `
     <a class="back" href="#/docs">素材</a>
     <div class="doc-head"><span class="doc-path">${esc(path)}${doc.offline ? "（端末の控え）" : ""}</span><a class="icon-btn" href="#/doc/${encodeURIComponent(path)}/edit" aria-label="編集">${ICONS.edit}</a></div>
+    ${toc}
     <article class="md">`;
   for (const s of sections) {
     const paras = s.blocks.filter((b) => b.type === "p");
     if (s.head) {
       const title = s.head.text.replace(/（\d+字）$/, "");
       const lv = s.head.level + 1;
-      if (paras.length) {
-        const text = paras.map((p) => plain(p.text)).join("\n");
-        html += `<div class="sec-head"><h${lv}>${inline(title, { dir })}</h${lv}>
+      const id = heads.includes(s) ? ` id="h-${heads.indexOf(s)}"` : "";
+      const text = paras.map((p) => plain(p.text)).join("\n");
+      // 文字数とコピーは、ESにそのまま使う長さの文章がある見出しだけに出す
+      if (countChars(text) >= 60) {
+        html += `<div class="sec-head"${id}><h${lv}>${inline(title, { dir })}</h${lv}>
           <span class="chars">${countChars(text)}字</span>
           <button class="mini" data-copy="${esc(text)}">コピー</button></div>`;
       } else {
-        html += `<h${lv}>${inline(title, { dir })}</h${lv}>`;
+        html += `<h${lv}${id}>${inline(title, { dir })}</h${lv}>`;
       }
     }
     html += s.blocks.map((b) => b.html).join("");
@@ -1321,7 +1348,9 @@ async function render() {
     return;
   }
   if (!state.loaded) {
-    view.innerHTML = state.error ? `<p class="error">${esc(state.error)}</p>` : `<p class="hint loading">読み込み中…</p>`;
+    view.innerHTML = state.error
+      ? `<div class="error-panel"><p class="error">${esc(state.error)}</p><button class="btn primary wide" data-retry>もう一度読み込む</button></div>`
+      : `<div class="skeleton" aria-label="読み込み中"><i></i><i></i><i></i><i></i></div>`;
     return;
   }
   const { parts, query } = route();
@@ -1367,6 +1396,15 @@ function afterRender(name, sub) {
     if (!ui.q) box.focus();
     loadAllDocs();
   }
+  if (name === "logins") {
+    const box = document.getElementById("lq");
+    box.addEventListener("input", () => {
+      const q = box.value.trim().toLowerCase();
+      document.querySelectorAll(".login-row").forEach((li) => {
+        li.hidden = !!q && !li.querySelector(".lr-name").textContent.toLowerCase().includes(q);
+      });
+    });
+  }
   if (name === "companies") {
     const box = document.getElementById("cq");
     box.addEventListener("input", () => {
@@ -1389,14 +1427,26 @@ function bindDocCounter() {
 }
 
 let toastTimer;
-function toast(message, isError = false) {
+let toastAction = null;
+// action を渡すと「元に戻す」ボタン付きで少し長めに出す
+function toast(message, isError = false, action = null) {
   const el = document.getElementById("toast");
-  el.textContent = message;
+  toastAction = action;
+  el.innerHTML = `<span>${esc(message)}</span>${action ? `<button class="toast-btn" data-toast-action>${esc(action.label)}</button>` : ""}`;
   el.classList.toggle("error", isError);
+  el.classList.toggle("actionable", !!action);
   el.classList.add("show");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove("show"), isError ? 6000 : 2200);
+  toastTimer = setTimeout(() => {
+    el.classList.remove("show");
+    toastAction = null;
+  }, isError ? 6000 : action ? 6000 : 2200);
 }
+
+// commit が別の端末の変更と合わせて保存したときの戻り値（真として扱える）
+const MERGED = 2;
+const undoable = (message, undo, result = true) =>
+  toast(result === MERGED ? "別の端末の変更と合わせて保存しました" : message, false, { label: "元に戻す", run: undo });
 
 async function copy(text, label = "") {
   try {
@@ -1416,20 +1466,21 @@ async function copy(text, label = "") {
 // 操作
 // =====================================================================
 
-async function markDone(key, done = true) {
+async function markDone(key, done = true, { undo = true } = {}) {
   const [slug, i] = key.split(":");
   const c = bySlug(slug);
   const target = c?.events?.[Number(i)];
   if (!target) return;
   const { title, date } = target;
-  await commit(() => {
+  const ok = await commit(() => {
     // 別の端末で予定が増減しても同じ予定を指すよう、内容と日付で探す
     const e = bySlug(slug)?.events?.find((x) => x.title === title && x.date === date);
     if (!e) return;
     if (done) e.done = true;
     else delete e.done;
-  }, `${c.name}: ${title} を${done ? "済み" : "未完了"}に`);
+  }, `${c.name}: ${title} を${done ? "済み" : "未完了"}に`, { quiet: undo });
   render();
+  if (ok && undo) undoable(done ? "済みにしました" : "未完了に戻しました", () => markDone(key, !done, { undo: false }), ok);
 }
 
 async function updateProgram(slug, pid, patch, note) {
@@ -1437,15 +1488,31 @@ async function updateProgram(slug, pid, patch, note) {
   const p = programOf(c, pid);
   if (!p) return;
   const label = c.programs.length > 1 ? `${p.title || p.kind}: ` : "";
-  await commit(() => {
+  const text = label + note;
+  const before = Object.fromEntries(Object.keys(patch).map((k) => [k, p[k]]));
+  const lastAction = c.lastAction;
+  const ok = await commit(() => {
     const x = bySlug(slug);
     const q = programOf(x, pid);
     if (!q) return;
     Object.assign(q, patch);
     x.lastAction = isoToday();
-    x.history = [{ date: isoToday(), text: label + note }, ...(x.history || [])];
-  }, `${c.name}: ${label}${note}`);
+    x.history = [{ date: isoToday(), text }, ...(x.history || [])];
+  }, `${c.name}: ${text}`, { quiet: true });
   render();
+  if (!ok) return;
+  undoable(note, async () => {
+    await commit(() => {
+      const x = bySlug(slug);
+      const q = programOf(x, pid);
+      if (!q) return;
+      Object.assign(q, before);
+      x.lastAction = lastAction;
+      const i = (x.history || []).findIndex((h) => h.text === text);
+      if (i >= 0) x.history.splice(i, 1);
+    }, `${c.name}: 取り消し（${text}）`);
+    render();
+  }, ok);
 }
 
 function statusClick(t) {
@@ -1479,6 +1546,22 @@ function statusClick(t) {
 document.addEventListener("click", async (ev) => {
   const t = ev.target.closest("button, [data-copy]");
   if (!t) return;
+  if (t.hasAttribute("data-toast-action")) {
+    const action = toastAction;
+    toastAction = null;
+    document.getElementById("toast").classList.remove("show");
+    if (action) await action.run();
+    return;
+  }
+  if (t.hasAttribute("data-retry")) {
+    state.error = null;
+    await Promise.all([loadCompanies(), loadDocList().catch(() => {})]);
+    return render();
+  }
+  if (t.dataset.jump) {
+    document.getElementById(t.dataset.jump)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
   if (t.dataset.copy !== undefined) return copy(t.dataset.copy, t.dataset.copyLabel);
   if (t.dataset.done) return markDone(t.dataset.done);
   if (t.dataset.state || t.dataset.step || t.dataset.pass) return statusClick(t);
@@ -1486,7 +1569,10 @@ document.addEventListener("click", async (ev) => {
     const [slug, n] = t.dataset.prio.split(":");
     const c = bySlug(slug);
     const v = c.priority === Number(n) ? 0 : Number(n);
-    return commit(() => { const x = bySlug(slug); if (x) x.priority = v; }, `${c.name}: 志望度を${PRIORITY_LABEL[v] || "未設定"}に`);
+    const old = c.priority || 0;
+    const ok = await commit(() => { const x = bySlug(slug); if (x) x.priority = v; }, `${c.name}: 志望度を${PRIORITY_LABEL[v] || "未設定"}に`, { quiet: true });
+    if (ok) undoable(`志望度を「${PRIORITY_LABEL[v] || "未設定"}」にしました`, () => commit(() => { const x = bySlug(slug); if (x) x.priority = old; }, `${c.name}: 志望度を戻す`), ok);
+    return;
   }
   if (t.dataset.filter !== undefined) {
     ui.industry = t.dataset.filter;
@@ -1695,6 +1781,18 @@ window.addEventListener("hashchange", () => {
 if ("serviceWorker" in navigator && location.protocol === "https:") {
   navigator.serviceWorker.register("sw.js").catch(() => { /* なくても動く */ });
 }
+// アプリに戻ってきたとき、前の読み込みから2分以上たっていれば最新にする（編集中は除く）
+document.addEventListener("visibilitychange", async () => {
+  if (document.visibilityState !== "visible" || !cfg.token || !state.loaded) return;
+  if (Date.now() - (state.loadedAt || 0) < 120000) return;
+  const { parts } = route();
+  if (["new", "add"].includes(parts[0]) || parts.includes("edit")) return;
+  const y = window.scrollY;
+  await loadCompanies();
+  render();
+  window.scrollTo(0, y);
+});
+
 window.addEventListener("online", async () => {
   if (!state.offline) return;
   await loadCompanies();
