@@ -3,10 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://api.github.com; img-src 'self' data:; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://api.github.com; img-src 'self' data:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex, nofollow">
-  <meta name="theme-color" content="#1E3A7B">
+  <meta name="theme-color" content="#f3f5f8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e121a" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="就活ボード">
   <title>就活ボード</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -18,26 +21,36 @@
 </head>
 <body>
   <header class="top">
-    <a class="brand" href="#/schedule">就活ボード</a>
-    <span id="today" class="today"></span>
+    <a class="brand" href="#/home"><img src="icon.svg" alt="" width="22" height="22">就活ボード</a>
     <a class="icon-btn" href="#/search" aria-label="検索" title="検索">
-      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
     </a>
     <button id="reload" class="icon-btn" aria-label="最新の内容を読み込む" title="最新の内容を読み込む">
-      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5"/></svg>
     </button>
     <a class="icon-btn" href="#/settings" aria-label="設定" title="設定">
-      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg>
     </a>
   </header>
 
   <main id="view"></main>
 
   <nav class="tabs" aria-label="画面の切り替え">
-    <a href="#/schedule" data-tab="schedule">予定</a>
-    <a href="#/companies" data-tab="companies">企業</a>
-    <a href="#/logins" data-tab="logins">ログイン</a>
-    <a href="#/docs" data-tab="docs">素材</a>
+    <a href="#/home" data-tab="home">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg>ホーム
+    </a>
+    <a href="#/calendar" data-tab="calendar">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>予定
+    </a>
+    <a href="#/companies" data-tab="companies">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V6l7-2v16M11 9h8v11M7 8h1M7 12h1M7 16h1M14 13h2M14 16h2M3 20h18"/></svg>企業
+    </a>
+    <a href="#/logins" data-tab="logins">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="m11 12 8-8M16 7l2 2M14 9l2 2"/></svg>ログイン
+    </a>
+    <a href="#/docs" data-tab="docs">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6zM14 3v4h4M9 12h6M9 16h6"/></svg>素材
+    </a>
   </nav>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
