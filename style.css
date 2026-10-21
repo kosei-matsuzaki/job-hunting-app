@@ -27,6 +27,8 @@
   --consult: #3b72b9;
   --maker: #b7791f;
   --sier: #b83280;
+  --trade: #2f6f3e;
+  --finance: #8a6d1d;
   --other: #6b7280;
   --intern: #0e8c86;
   --early: #a86400;
@@ -321,6 +323,8 @@ main { max-width: 680px; margin: 0 auto; padding: 4px var(--gutter) 0; }
 .avatar.consult, .ind-dot.consult { --c: var(--consult); }
 .avatar.maker, .ind-dot.maker { --c: var(--maker); }
 .avatar.sier, .ind-dot.sier { --c: var(--sier); }
+.avatar.trade, .ind-dot.trade { --c: var(--trade); }
+.avatar.finance, .ind-dot.finance { --c: var(--finance); }
 .ind-dot { --c: var(--other); display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c); margin-right: 6px; }
 
 /* 選考の種類・状況 */
@@ -1069,3 +1073,10 @@ fieldset [data-remove-fs] { grid-column: 1 / -1; justify-self: end; margin-top: 
 .skeleton i:first-child { height: 150px; background-color: var(--board); }
 @keyframes shimmer { to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .skeleton i { animation: none; } }
+
+/* ---------- 並び順・年収 ---------- */
+
+.sort-pick { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin: 2px 0 0; font-size: 0.8125rem; color: var(--muted); }
+.sort-pick select { width: auto; min-height: 34px; padding: 4px 10px; font-size: 0.875rem; background: var(--surface); }
+.co-salary { font-size: 0.8125rem; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.meta.avg { color: var(--ink); font-weight: 700; }

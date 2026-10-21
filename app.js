@@ -28,8 +28,13 @@ const STATE_RANK = { offer: 0, todo: 1, waiting: 2, before: 3, declined: 4, reje
 const KINDS = ["本選考", "インターン", "早期選考", "説明会・イベント"];
 const KIND_CLASS = { 本選考: "main", インターン: "intern", 早期選考: "early", "説明会・イベント": "info" };
 const OPEN_STATUSES = ["受付中", "受付前", "終了", "不明"];
-const INDUSTRIES = ["ゲーム", "IT・Web", "AI・R&D", "SIer・通信", "コンサル", "メーカー"];
-const IND_CLASS = { ゲーム: "game", "IT・Web": "web", "AI・R&D": "ai", "SIer・通信": "sier", コンサル: "consult", メーカー: "maker" };
+const INDUSTRIES = ["ゲーム", "IT・Web", "AI・R&D", "SIer・通信", "コンサル", "メーカー", "商社", "金融"];
+const IND_CLASS = { ゲーム: "game", "IT・Web": "web", "AI・R&D": "ai", "SIer・通信": "sier", コンサル: "consult", メーカー: "maker", 商社: "trade", 金融: "finance" };
+const SORTS = [
+  { v: "deadline", label: "締切が近い順" },
+  { v: "salary", label: "初任給が高い順" },
+  { v: "priority", label: "志望度順" },
+];
 const DEFAULT_FLOW = ["ES", "Webテスト", "一次面接", "最終面接"];
 const PRIORITY_LABEL = { 3: "第一志望群", 2: "受けたい", 1: "様子見" };
 const EVENT_KINDS = [
@@ -68,6 +73,7 @@ const cfg = {
 const ui = {
   industry: store.get("jh.industry") || "",
   kind: store.get("jh.kind") || "",
+  sort: store.get("jh.sort") || "deadline",
   cq: "",
   q: "",
 };
@@ -703,13 +709,20 @@ function viewCalendar(sel) {
 // =====================================================================
 
 function companyRows() {
-  const order = (a, b) => {
+  const byName = (a, b) => a.name.localeCompare(b.name, "ja");
+  const byDeadline = (a, b) => {
     const na = nextEvent(a);
     const nb = nextEvent(b);
     if (na && nb) return byWhen(na, nb);
     if (na || nb) return na ? -1 : 1;
-    return (b.priority || 0) - (a.priority || 0) || a.name.localeCompare(b.name, "ja");
+    return (b.priority || 0) - (a.priority || 0) || byName(a, b);
   };
+  const order = {
+    deadline: byDeadline,
+    // 初任給が分からない企業は後ろに
+    salary: (a, b) => (b.salary || 0) - (a.salary || 0) || byDeadline(a, b),
+    priority: (a, b) => (b.priority || 0) - (a.priority || 0) || byDeadline(a, b),
+  }[ui.sort] || byDeadline;
   const q = ui.cq.trim().toLowerCase();
   const pool = state.companies.filter(
     (c) =>
@@ -727,6 +740,7 @@ function companyRows() {
           <span class="co-top"><span class="co-name">${esc(c.name)}</span>${stars(c)}<span class="co-ind">${esc(c.industry || "")}</span></span>
           <span class="co-progs">${progChips(progs) || '<span class="hint">選考ルート未登録</span>'}</span>
           ${nx ? `<span class="co-next ${urgency(daysUntil(nx.date))}">${esc(fmtDate(nx.date))} ${esc(nx.title)}<span>${esc(remainText(daysUntil(nx.date)))}</span></span>` : ""}
+          ${ui.sort === "salary" ? `<span class="co-salary">${c.salary ? `初任給 ¥${Number(c.salary).toLocaleString()}` : "初任給 不明"}</span>` : ""}
         </span>
       </a></li>`;
   };
@@ -766,6 +780,7 @@ function viewCompanies() {
     <div class="chips" role="group" aria-label="業界">
       ${["", ...industries].map((i) => `<button data-filter="${esc(i)}" aria-pressed="${ui.industry === i}">${i ? `<i class="ind-dot ${IND_CLASS[i] || "other"}"></i>${esc(i)}<span>${counts[i]}</span>` : "すべて"}</button>`).join("")}
     </div>
+    <label class="sort-pick">並び順<select id="co-sort">${SORTS.map((o) => `<option value="${o.v}"${o.v === ui.sort ? " selected" : ""}>${o.label}</option>`).join("")}</select></label>
     <div id="co-results">${companyRows()}</div>`;
 }
 
@@ -853,6 +868,7 @@ function viewCompany(slug, pid) {
   const p = programOf(c, pid) || defaultProgram(c);
   const m = c.mypage;
   const meta = [c.industry, c.salary ? `初任給 ¥${Number(c.salary).toLocaleString()}` : "", c.lastAction ? `最終更新 ${fmtDate(c.lastAction, true)}` : ""].filter(Boolean);
+  const avg = c.avgSalary ? `<p class="meta avg">${esc(c.avgSalary)}</p>` : "";
 
   let html = `
     <a class="back" href="#/companies">企業</a>
@@ -861,6 +877,7 @@ function viewCompany(slug, pid) {
       <div class="co-hero-body">
         <h1 class="page-title">${esc(c.name)}</h1>
         <p class="meta">${meta.map(esc).join("　")}</p>
+        ${avg}
         <div class="stars" role="group" aria-label="志望度">
           ${[1, 2, 3].map((n) => `<button data-prio="${esc(c.slug)}:${n}" aria-pressed="${n <= (c.priority || 0)}" aria-label="志望度 ${n}">★</button>`).join("")}
           <span class="stars-label">${esc(PRIORITY_LABEL[c.priority] || "志望度")}</span>
@@ -984,7 +1001,8 @@ function viewEdit(slug) {
         </div>
         <datalist id="industries">${INDUSTRIES.map((i) => `<option value="${i}">`).join("")}</datalist>
         <label>新卒採用ページURL<input type="url" name="recruitUrl" value="${esc(c.recruitUrl || "")}" autocapitalize="off"></label>
-        <label>初任給（円）<input type="number" name="salary" inputmode="numeric" value="${esc(c.salary || "")}"></label>
+        <label>初任給（修士・月額、円）<input type="number" name="salary" inputmode="numeric" value="${esc(c.salary || "")}"></label>
+        <label>平均年収など（有価証券報告書の値と年度）<input name="avgSalary" value="${esc(c.avgSalary || "")}"></label>
       </section>
 
       <h2 class="sec">マイページ</h2>
@@ -1055,6 +1073,7 @@ function readForm(form) {
     priority: Number(get("priority")) || 0,
     recruitUrl: get("recruitUrl"),
     salary: get("salary") ? Number(get("salary")) : null,
+    avgSalary: get("avgSalary"),
     mypage: { url: get("mpUrl"), id: get("mpId"), password: get("mpPassword") },
     programs,
     events: [...form.querySelectorAll("fieldset.ev")].map(readEvent).filter((e) => e.title || e.date),
@@ -1234,7 +1253,7 @@ function searchResults(q) {
   if (!terms.length) return `<p class="hint">企業名・選考ルート・メモ・予定・ESの文章をまとめて探せます。スペースで区切ると、すべてを含むものに絞ります。</p>`;
   const hit = (text) => terms.every((t) => text.toLowerCase().includes(t.toLowerCase()));
   const companies = state.companies.filter((c) =>
-    hit([c.name, c.industry, c.memo, ...c.todo, ...c.programs.flatMap((p) => [p.kind, p.title, p.process, p.step, STATES[p.state].label, ...p.flow])].join("\n")),
+    hit([c.name, c.industry, c.memo, c.avgSalary || "", ...c.todo, ...c.programs.flatMap((p) => [p.kind, p.title, p.process, p.step, STATES[p.state].label, ...p.flow])].join("\n")),
   );
   const events = allEvents().filter((e) => hit(`${e.c.name} ${e.title}`)).sort(byWhen);
   const docs = [];
@@ -1406,6 +1425,11 @@ function afterRender(name, sub) {
     });
   }
   if (name === "companies") {
+    document.getElementById("co-sort").addEventListener("change", (ev) => {
+      ui.sort = ev.target.value;
+      store.set("jh.sort", ui.sort);
+      document.getElementById("co-results").innerHTML = companyRows();
+    });
     const box = document.getElementById("cq");
     box.addEventListener("input", () => {
       ui.cq = box.value;
@@ -1725,6 +1749,7 @@ document.addEventListener("submit", async (ev) => {
       });
       Object.assign(c, structuredClone({ ...data, programs }));
       if (!c.salary) delete c.salary;
+      if (!c.avgSalary) delete c.avgSalary;
       if (!c.priority) delete c.priority;
     }, `${data.name} を${isNew ? "追加" : "更新"}`);
     if (saved) location.hash = `#/c/${slug}`;
