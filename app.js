@@ -13,17 +13,34 @@ const DOC_GROUPS = [
 const EXTRA_DOCS = [{ path: "links.md", name: "就活サイト・対策" }];
 
 // 選考ルートごとの状況。step は選考フローの中のいまの段階
+// 「気になる → 応募予定 → 選考中（対応中・結果待ち） → 内定」と進み、途中で終わったら「終了」
 const STATES = {
-  todo: { label: "対応中", hint: "自分の番。提出・受験・面接を控えている" },
-  waiting: { label: "結果待ち", hint: "相手の番。結果や連絡を待っている" },
-  before: { label: "エントリー前", hint: "まだ応募していない" },
-  offer: { label: "内定", hint: "" },
-  declined: { label: "辞退", hint: "" },
-  rejected: { label: "不合格", hint: "" },
+  watch: { label: "気になる", hint: "候補。まだ応募するか決めていない" },
+  plan: { label: "応募予定", hint: "応募すると決めた。締切を追いかける" },
+  todo: { label: "対応中", long: "選考中（自分の番）", hint: "提出・受験・面接を控えている" },
+  waiting: { label: "結果待ち", long: "選考中（相手の番）", hint: "結果や連絡を待っている" },
+  offer: { label: "内定", hint: "内定をもらった" },
+  skip: { label: "見送り", hint: "応募しないと決めた" },
+  declined: { label: "辞退", hint: "選考の途中や内定のあとに辞退した" },
+  rejected: { label: "不合格", hint: "選考で不合格だった" },
 };
-const LIVE = ["before", "todo", "waiting"];
-const ENDED = new Set(["declined", "rejected"]);
-const STATE_RANK = { offer: 0, todo: 1, waiting: 2, before: 3, declined: 4, rejected: 5 };
+const STATE_GROUPS = [
+  { label: "応募する前", states: ["watch", "plan"] },
+  { label: "選考中", states: ["todo", "waiting"] },
+  { label: "結果", states: ["offer", "declined", "rejected", "skip"] },
+];
+const LIVE = ["watch", "plan", "todo", "waiting"];
+const IN_SELECTION = new Set(["todo", "waiting"]);
+const TRACKED = new Set(["plan", "todo", "waiting", "offer"]);
+const ENDED = new Set(["skip", "declined", "rejected"]);
+const STATE_RANK = { offer: 0, todo: 1, waiting: 2, plan: 3, watch: 4, skip: 5, declined: 6, rejected: 7 };
+// 企業一覧のタブ
+const COMPANY_TABS = [
+  { v: "active", label: "選考中", test: (s) => s === "todo" || s === "waiting" || s === "offer" },
+  { v: "plan", label: "応募予定", test: (s) => s === "plan" },
+  { v: "watch", label: "気になる", test: (s) => s === "watch" },
+  { v: "closed", label: "終了", test: (s) => ENDED.has(s) },
+];
 
 const KINDS = ["本選考", "インターン", "早期選考", "説明会・イベント"];
 const KIND_CLASS = { 本選考: "main", インターン: "intern", 早期選考: "early", "説明会・イベント": "info" };
@@ -73,6 +90,8 @@ const cfg = {
 const ui = {
   industry: store.get("jh.industry") || "",
   kind: store.get("jh.kind") || "",
+  ctab: store.get("jh.ctab") || "",
+  calAll: store.get("jh.calAll") === "1",
   sort: store.get("jh.sort") || "deadline",
   cq: "",
   q: "",
@@ -189,7 +208,8 @@ function normalize(c) {
   for (const p of c.programs) {
     p.id ||= newId();
     p.flow ||= [];
-    p.state = STATES[p.state] ? p.state : "before";
+    if (p.state === "before") p.state = "watch"; // 旧「エントリー前」
+    p.state = STATES[p.state] ? p.state : "watch";
     p.step ||= "";
   }
   return c;
@@ -359,7 +379,7 @@ const programOf = (c, pid) => c?.programs.find((p) => p.id === pid);
 const flowIndex = (p) => p.flow.indexOf(p.step);
 
 function companyState(c) {
-  if (!c.programs.length) return "before";
+  if (!c.programs.length) return "watch";
   return c.programs.map((p) => p.state).sort((a, b) => STATE_RANK[a] - STATE_RANK[b])[0];
 }
 
@@ -394,6 +414,7 @@ function avatar(c, size = "") {
 
 const kindBadge = (kind) => `<span class="kind ${KIND_CLASS[kind] || "main"}">${esc(kind)}</span>`;
 const statePill = (s) => `<span class="pill ${s}">${STATES[s].label}</span>`;
+const isTracked = (c) => TRACKED.has(companyState(c));
 const stars = (c) => (c.priority ? `<span class="stars-mini" title="志望度: ${PRIORITY_LABEL[c.priority]}">${"★".repeat(c.priority)}</span>` : "");
 
 function eventTitle(e, showProgram = false) {
@@ -413,24 +434,21 @@ function routeMini(p) {
     .join("")}</span>`;
 }
 
-// 一覧用: 進んでいるルートは状況つき、まだのルートは種類だけをまとめて出す
-function progChips(progs) {
-  const active = progs.filter((p) => p.state !== "before");
-  const waitingKinds = {};
-  for (const p of progs.filter((q) => q.state === "before")) waitingKinds[p.kind] = (waitingKinds[p.kind] || 0) + 1;
-  const open = progs.some((p) => p.state === "before" && p.status === "受付中");
-  return (
-    active.map(progChip).join("") +
-    (open ? '<span class="open-dot">受付中</span>' : "") +
-    Object.entries(waitingKinds)
-      .map(([k, n]) => `<span class="prog-chip before">${kindBadge(k)}${n > 1 ? `<span>×${n}</span>` : ""}</span>`)
-      .join("")
-  );
+// 一覧用の状況: 選考中なら段階つき、それ以外は状況と受付状況
+function companyStatusLine(c) {
+  const s = companyState(c);
+  const lead = [...c.programs].sort((a, b) => STATE_RANK[a.state] - STATE_RANK[b.state])[0];
+  if (lead && IN_SELECTION.has(s)) {
+    return `${routeMini(lead)}${lead.step ? `<b class="co-step">${esc(lead.step)}</b>` : ""}${statePill(s)}${c.programs.length > 1 ? kindBadge(lead.kind) : ""}`;
+  }
+  const open = c.programs.some((p) => LIVE.includes(p.state) && p.status === "受付中");
+  const kinds = [...new Set(c.programs.filter((p) => p.kind !== "説明会・イベント").map((p) => p.kind))];
+  return `${statePill(s)}${open ? '<span class="open-dot">受付中</span>' : ""}<span class="co-kinds">${kinds.map(esc).join("・")}</span>`;
 }
 
 function progChip(p) {
   const s = p.state;
-  const step = LIVE.includes(s) && s !== "before" && p.step ? `${esc(p.step)} ` : "";
+  const step = IN_SELECTION.has(s) && p.step ? `${esc(p.step)} ` : "";
   return `<span class="prog-chip ${s}">${kindBadge(p.kind)}<span>${step}${STATES[s].label}</span></span>`;
 }
 
@@ -531,19 +549,26 @@ const $view = () => document.getElementById("view");
 
 function viewHome() {
   const t = today();
-  const live = liveEvents();
+  // ホームには「応募予定・選考中・内定」の企業だけを出す。気になる企業は件数だけ
+  const all = liveEvents();
+  const live = all.filter((e) => isTracked(e.c));
   const upcoming = live.filter((e) => daysUntil(e.date) >= 0).sort(byWhen);
   const week = upcoming.filter((e) => daysUntil(e.date) <= 6);
   const overdue = live.filter((e) => daysUntil(e.date) < 0 && daysUntil(e.date) >= -PAST_DAYS).sort(byWhen);
+  const watchSoon = all.filter((e) => companyState(e.c) === "watch" && daysUntil(e.date) >= 0 && daysUntil(e.date) <= 14 && e.kind !== "event");
+  const watchSoonCompanies = new Set(watchSoon.map((e) => e.c.slug)).size;
   const active = state.companies
-    .flatMap((c) => c.programs.filter((p) => p.state === "todo" || p.state === "waiting").map((p) => ({ c, p, nx: nextEvent(c, p.id) })))
+    .flatMap((c) => c.programs.filter((p) => IN_SELECTION.has(p.state)).map((p) => ({ c, p, nx: nextEvent(c, p.id) })))
     .sort((a, b) => STATE_RANK[a.p.state] - STATE_RANK[b.p.state] || (a.nx && b.nx ? byWhen(a.nx, b.nx) : a.nx ? -1 : b.nx ? 1 : 0));
+  const count = (tab) => state.companies.filter((c) => COMPANY_TABS.find((x) => x.v === tab).test(companyState(c))).length;
 
   let html = `
     <header class="page-head">
       <h1 class="page-title">${t.getMonth() + 1}月${t.getDate()}日<span class="wd">${WD[t.getDay()]}曜日</span></h1>
-      <p class="page-sub">今週の予定 ${week.length}件 ・ 選考中 ${active.length}件</p>
-    </header>`;
+    </header>
+    <nav class="tally" aria-label="企業の状況">
+      ${["active", "plan", "watch"].map((v) => `<a href="#/companies" data-goto-tab="${v}" class="tally-item ${v}"><b>${count(v)}</b>${COMPANY_TABS.find((x) => x.v === v).label}</a>`).join("")}
+    </nav>`;
 
   // 説明会より、応募（本選考・インターン）の締切を先に出す
   const next = upcoming.find((e) => e.p?.kind !== "説明会・イベント") || upcoming[0];
@@ -565,7 +590,7 @@ function viewHome() {
         </div>
       </section>`;
   } else {
-    html += `<section class="empty-panel">登録されている予定はありません。<a href="#/add">予定を追加</a></section>`;
+    html += `<section class="empty-panel">応募予定・選考中の企業に、これからの締切はありません。<br><a href="#/companies" data-goto-tab="watch">「気になる」から応募する企業を選ぶ</a></section>`;
   }
 
   // 1週間の帯
@@ -584,9 +609,7 @@ function viewHome() {
   }
   html += `</ol>`;
 
-  if (!week.length) {
-    html += `<p class="hint week-empty">今週の予定はありません。</p>`;
-  } else {
+  if (week.length) {
     html += `<section class="sheet agenda">`;
     for (const [iso, evs] of groupByDay(week)) {
       html += `<h2 class="day-head ${urgency(daysUntil(iso))}">${esc(dayLabel(iso))}</h2><ul class="ev-list">${evs.map((e) => eventRow(e)).join("")}</ul>`;
@@ -597,6 +620,9 @@ function viewHome() {
   if (later.length) {
     html += `<h2 class="sec">その先の予定<a class="sec-link" href="#/calendar">カレンダー</a></h2><ul class="ev-list plain">${later.map((e) => eventRow(e, { date: true })).join("")}</ul>`;
   }
+  if (watchSoon.length) {
+    html += `<a class="notice-link" href="#/companies" data-goto-tab="watch">「気になる」企業に、2週間以内の締切が${watchSoon.length}件（${watchSoonCompanies}社）あります<span>見る</span></a>`;
+  }
 
   if (active.length) {
     html += `<h2 class="sec">選考中</h2><ul class="active-list">`;
@@ -606,7 +632,7 @@ function viewHome() {
           ${avatar(c)}
           <span class="ar-body">
             <span class="ar-name">${esc(c.name)}</span>
-            <span class="ar-prog">${kindBadge(p.kind)}${routeMini(p)}<b>${esc(p.step || "")}</b>${statePill(p.state)}</span>
+            <span class="ar-prog">${routeMini(p)}<b>${esc(p.step || "")}</b>${statePill(p.state)}${c.programs.length > 1 ? kindBadge(p.kind) : ""}</span>
             ${nx ? `<span class="ar-next ${urgency(daysUntil(nx.date))}">${esc(fmtDate(nx.date))} ${esc(nx.title)}</span>` : ""}
           </span>
         </a></li>`;
@@ -620,7 +646,7 @@ function viewHome() {
       <ul class="ev-list plain">${overdue.map((e) => eventRow(e, { date: true })).join("")}</ul>`;
   }
 
-  const todos = state.companies.filter((c) => c.todo.length && !isEnded(c));
+  const todos = state.companies.filter((c) => c.todo.length && isTracked(c));
   if (todos.length) {
     const total = todos.reduce((n, c) => n + c.todo.length, 0);
     html += `<details class="todos"><summary>調べること・転記すること<span class="count">${total}</span></summary><ul>`;
@@ -645,7 +671,7 @@ function viewCalendar(sel) {
   const daysInMonth = new Date(y, m + 1, 0).getDate();
   const weeks = Math.ceil((first.getDay() + daysInMonth) / 7);
   const start = addDays(first, -first.getDay());
-  const events = allEvents().filter((e) => !isEnded(e.c));
+  const events = allEvents().filter((e) => !isEnded(e.c) && (ui.calAll || isTracked(e.c)));
   const byDate = new Map();
   for (const e of events) {
     if (!byDate.has(e.date)) byDate.set(e.date, []);
@@ -661,6 +687,10 @@ function viewCalendar(sel) {
       <a class="icon-btn" href="#/calendar/${next}" aria-label="次の月">›</a>
       <a class="btn small" href="#/calendar/${isoToday()}">今日</a>
     </header>
+    <div class="seg small cal-scope" role="group" aria-label="表示する企業">
+      <button data-calall="0" aria-pressed="${!ui.calAll}">応募予定・選考中</button>
+      <button data-calall="1" aria-pressed="${ui.calAll}">気になる企業も</button>
+    </div>
     <div class="cal" role="grid" aria-label="${y}年${m + 1}月">
       <div class="cal-row cal-wd" role="row">${[...WD].map((w, i) => `<span role="columnheader" class="${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</span>`).join("")}</div>`;
   for (let w = 0; w < weeks; w++) {
@@ -708,6 +738,20 @@ function viewCalendar(sel) {
 // 画面: 企業一覧
 // =====================================================================
 
+function currentTab() {
+  if (COMPANY_TABS.some((t) => t.v === ui.ctab)) return ui.ctab;
+  return state.companies.some((c) => IN_SELECTION.has(companyState(c)) || companyState(c) === "offer") ? "active" : "plan";
+}
+
+function companyPool() {
+  const q = ui.cq.trim().toLowerCase();
+  return state.companies.filter(
+    (c) =>
+      (!ui.industry || c.industry === ui.industry) &&
+      (!q || `${c.name} ${c.industry} ${c.programs.map((p) => p.title).join(" ")}`.toLowerCase().includes(q)),
+  );
+}
+
 function companyRows() {
   const byName = (a, b) => a.name.localeCompare(b.name, "ja");
   const byDeadline = (a, b) => {
@@ -723,64 +767,66 @@ function companyRows() {
     salary: (a, b) => (b.salary || 0) - (a.salary || 0) || byDeadline(a, b),
     priority: (a, b) => (b.priority || 0) - (a.priority || 0) || byDeadline(a, b),
   }[ui.sort] || byDeadline;
-  const q = ui.cq.trim().toLowerCase();
-  const pool = state.companies.filter(
-    (c) =>
-      (!ui.industry || c.industry === ui.industry) &&
-      (!ui.kind || c.programs.some((p) => p.kind === ui.kind)) &&
-      (!q || `${c.name} ${c.industry} ${c.programs.map((p) => p.title).join(" ")}`.toLowerCase().includes(q)),
-  );
+  const tab = currentTab();
+  const test = COMPANY_TABS.find((t) => t.v === tab).test;
+  const items = companyPool().filter((c) => test(companyState(c))).sort(order);
+
   const row = (c) => {
     const nx = nextEvent(c);
-    const progs = ui.kind ? c.programs.filter((p) => p.kind === ui.kind) : c.programs;
     return `
-      <li><a class="co-row" href="#/c/${esc(c.slug)}">
-        ${avatar(c)}
-        <span class="co-body">
-          <span class="co-top"><span class="co-name">${esc(c.name)}</span>${stars(c)}<span class="co-ind">${esc(c.industry || "")}</span></span>
-          <span class="co-progs">${progChips(progs) || '<span class="hint">選考ルート未登録</span>'}</span>
-          ${nx ? `<span class="co-next ${urgency(daysUntil(nx.date))}">${esc(fmtDate(nx.date))} ${esc(nx.title)}<span>${esc(remainText(daysUntil(nx.date)))}</span></span>` : ""}
-          ${ui.sort === "salary" ? `<span class="co-salary">${c.salary ? `初任給 ¥${Number(c.salary).toLocaleString()}` : "初任給 不明"}</span>` : ""}
-        </span>
-      </a></li>`;
+      <li class="co-item">
+        <a class="co-row" href="#/c/${esc(c.slug)}">
+          ${avatar(c)}
+          <span class="co-body">
+            <span class="co-top"><span class="co-name">${esc(c.name)}</span>${stars(c)}</span>
+            <span class="co-status">${companyStatusLine(c)}</span>
+            ${nx ? `<span class="co-next ${urgency(daysUntil(nx.date))}"><span>${esc(fmtDate(nx.date))}</span>${esc(nx.title)}<em>${esc(remainText(daysUntil(nx.date)))}</em></span>` : ""}
+            ${ui.sort === "salary" ? `<span class="co-salary">${c.salary ? `初任給 ¥${Number(c.salary).toLocaleString()}` : "初任給 不明"}</span>` : ""}
+          </span>
+          <span class="co-ind"><i class="ind-dot ${IND_CLASS[c.industry] || "other"}"></i>${esc(c.industry || "")}</span>
+        </a>
+        ${tab === "watch" ? `<div class="triage">
+          <button class="mini primary" data-triage="${esc(c.slug)}:plan">応募予定にする</button>
+          <button class="mini" data-triage="${esc(c.slug)}:skip">見送る</button>
+        </div>` : ""}
+      </li>`;
   };
-  const canApply = (c) => c.programs.some((p) => p.state === "before" && p.status === "受付中");
-  const groups = [
-    { label: "対応中", hint: "", test: (c) => companyState(c) === "todo" },
-    { label: "結果待ち", hint: "", test: (c) => companyState(c) === "waiting" },
-    { label: "内定", hint: "", test: (c) => companyState(c) === "offer" },
-    { label: "応募できる", hint: "受付中のルートがあり、まだ応募していない企業", test: (c) => companyState(c) === "before" && canApply(c) },
-    { label: "まだ受付前", hint: "", test: (c) => companyState(c) === "before" && !canApply(c) },
-  ];
-  let html = "";
-  for (const g of groups) {
-    const items = pool.filter(g.test).sort(order);
-    if (items.length) {
-      html += `<h2 class="sec">${g.label}<span class="count">${items.length}</span></h2>${g.hint ? `<p class="hint sec-hint">${g.hint}</p>` : ""}<ul class="co-list">${items.map(row).join("")}</ul>`;
-    }
-  }
-  const ended = pool.filter(isEnded);
-  if (ended.length) html += `<details class="ended"><summary>終了した企業<span class="count">${ended.length}</span></summary><ul class="co-list">${ended.map(row).join("")}</ul></details>`;
-  return html || `<p class="empty">当てはまる企業はありません。</p>`;
+  const hints = {
+    active: "選考が進んでいる企業と内定。",
+    plan: "応募すると決めた企業。締切がホームに出ます。",
+    watch: "候補の企業。応募するなら「応募予定にする」、しないなら「見送る」。",
+    closed: "見送り・辞退・不合格の企業。",
+  };
+  const empty = {
+    active: "選考中の企業はまだありません。応募したら、企業ページの状況を「対応中」にしてください。",
+    plan: "応募予定の企業はまだありません。「気になる」タブから選べます。",
+    watch: "「気になる」企業はありません。",
+    closed: "終了した企業はありません。",
+  };
+  return `<p class="hint tab-hint">${hints[tab]}</p>` + (items.length ? `<ul class="co-list">${items.map(row).join("")}</ul>` : `<p class="empty">${empty[tab]}</p>`);
 }
 
 function viewCompanies() {
   const counts = {};
   for (const c of state.companies) if (c.industry) counts[c.industry] = (counts[c.industry] || 0) + 1;
   const industries = [...INDUSTRIES.filter((i) => counts[i]), ...Object.keys(counts).filter((i) => !INDUSTRIES.includes(i))];
+  const tab = currentTab();
+  const pool = companyPool();
   return `
     <header class="page-head row">
       <h1 class="page-title">企業<span class="count">${state.companies.length}社</span></h1>
       <a class="btn" href="#/new">${ICONS.plus}追加</a>
     </header>
-    <input id="cq" class="search-box" type="search" placeholder="企業名で探す" value="${esc(ui.cq)}" enterkeyhint="search">
-    <div class="seg small" role="group" aria-label="選考の種類">
-      ${["", "本選考", "インターン"].map((k) => `<button data-kind="${k}" aria-pressed="${ui.kind === k}">${k || "すべて"}</button>`).join("")}
+    <div class="ctabs" role="tablist" aria-label="状況">
+      ${COMPANY_TABS.map((t) => `<button role="tab" data-ctab="${t.v}" aria-selected="${t.v === tab}">${t.label}<span>${pool.filter((c) => t.test(companyState(c))).length}</span></button>`).join("")}
+    </div>
+    <div class="filter-bar">
+      <input id="cq" class="search-box" type="search" placeholder="企業名で探す" value="${esc(ui.cq)}" enterkeyhint="search">
+      <select id="co-sort" aria-label="並び順">${SORTS.map((o) => `<option value="${o.v}"${o.v === ui.sort ? " selected" : ""}>${o.label}</option>`).join("")}</select>
     </div>
     <div class="chips" role="group" aria-label="業界">
-      ${["", ...industries].map((i) => `<button data-filter="${esc(i)}" aria-pressed="${ui.industry === i}">${i ? `<i class="ind-dot ${IND_CLASS[i] || "other"}"></i>${esc(i)}<span>${counts[i]}</span>` : "すべて"}</button>`).join("")}
+      ${["", ...industries].map((i) => `<button data-filter="${esc(i)}" aria-pressed="${ui.industry === i}">${i ? `<i class="ind-dot ${IND_CLASS[i] || "other"}"></i>${esc(i)}<span>${counts[i]}</span>` : "すべての業界"}</button>`).join("")}
     </div>
-    <label class="sort-pick">並び順<select id="co-sort">${SORTS.map((o) => `<option value="${o.v}"${o.v === ui.sort ? " selected" : ""}>${o.label}</option>`).join("")}</select></label>
     <div id="co-results">${companyRows()}</div>`;
 }
 
@@ -807,49 +853,46 @@ function programPanel(c, p) {
     html += `<p class="prog-next ${urgency(n)}"><b>次の予定</b>${esc(fmtDate(nx.date))}${nx.time ? ` ${esc(nx.time)}` : ""} ${esc(nx.title)}<span>${esc(remainText(n))}</span></p>`;
   }
 
-  if (ENDED.has(s) || s === "offer") {
-    html += `<div class="state-final">${statePill(s)}<span>${p.step ? `${esc(p.step)}まで進みました` : ""}</span>
-      <button class="mini" data-state="${key}:todo">選考中に戻す</button></div>`;
-  } else {
-    html += `<div class="seg" role="group" aria-label="いまの状況">${LIVE.map(
-      (k) => `<button data-state="${key}:${k}" aria-pressed="${k === s}">${STATES[k].label}</button>`,
-    ).join("")}</div>
-      <p class="hint">${esc(STATES[s].hint)}</p>`;
+  // 状況: 押すとシートで選べる
+  html += `<button class="status-btn ${s}" data-sheet="${key}" aria-haspopup="dialog">
+      ${statePill(s)}<span class="status-text">${esc(STATES[s].long || STATES[s].hint)}</span><span class="status-change">変更</span>
+    </button>`;
+
+  if (IN_SELECTION.has(s)) {
+    html += `<div class="seg small turn" role="group" aria-label="いまはどちらの番か">
+      <button data-state="${key}:todo" aria-pressed="${s === "todo"}">自分の番</button>
+      <button data-state="${key}:waiting" aria-pressed="${s === "waiting"}">結果待ち</button>
+    </div>`;
   }
 
   if (p.flow.length) {
     html += `<ol class="route${ENDED.has(s) ? " dim" : ""}">`;
     p.flow.forEach((name, i) => {
       const cls = s === "offer" || i < idx ? "past" : i === idx ? "now" : "";
-      const tag = i === idx && (s === "todo" || s === "waiting") ? `<span class="here ${s}">${STATES[s].label}</span>` : "";
+      const tag = i === idx && IN_SELECTION.has(s) ? `<span class="here ${s}">${STATES[s].label}</span>` : "";
       html += `<li class="${cls}"><button class="station" data-step="${key}:${i}" aria-label="段階を「${esc(name)}」にする">
         <span class="st"></span><span class="route-name">${esc(name)}</span>${tag}</button></li>`;
     });
-    html += `</ol>`;
+    html += `</ol><p class="hint route-hint">駅を押すと、いまの段階を変えられます。</p>`;
   }
 
-  if (LIVE.includes(s)) {
+  // いま一番よく押すボタンを1つだけ大きく出す
+  if (s === "watch") {
+    html += `<div class="actions-row">
+      <button class="btn primary" data-state="${key}:plan">応募予定にする</button>
+      <button class="btn" data-pass="${key}">もう応募した</button>
+    </div>`;
+  } else if (s === "plan") {
+    html += `<button class="btn primary wide" data-pass="${key}">応募した${p.flow[0] ? `（${esc(p.flow[0])}から選考開始）` : ""}</button>`;
+  } else if (IN_SELECTION.has(s) && p.flow.length) {
     const nextStep = idx >= 0 ? p.flow[idx + 1] : p.flow[0];
-    const label = !p.flow.length
-      ? ""
-      : idx < 0
-        ? `選考を始める（${p.flow[0]}から）`
-        : nextStep
-          ? `${p.flow[idx]}を通過した（次は${nextStep}）`
-          : `${p.flow[idx]}を通過した（内定）`;
-    if (label) html += `<button class="btn primary wide" data-pass="${key}">${esc(label)}</button>`;
-    if (s !== "before") {
-      html += `<div class="outcome-row">
-        <button class="mini" data-state="${key}:offer">内定</button>
-        <button class="mini" data-state="${key}:declined">辞退した</button>
-        <button class="mini danger" data-state="${key}:rejected">不合格だった</button>
-      </div>`;
-    }
-    if (s === "todo" && /面接/.test(p.step)) {
-      html += `<a class="btn ghost wide" href="#/doc/${encodeURIComponent("profile/08_面接想定問答.md")}">面接の想定問答を開く</a>`;
-    } else if (s === "todo" && /ES|書類|エントリー/.test(p.step)) {
-      html += `<a class="btn ghost wide" href="#/doc/${encodeURIComponent(hasNote(c.slug) ? `notes/${c.slug}.md` : "profile/README.md")}">ESの${hasNote(c.slug) ? "下書き" : "素材"}を開く</a>`;
-    }
+    const label = idx < 0 ? `選考を始める（${p.flow[0]}から）` : nextStep ? `${p.flow[idx]}を通過した（次は${nextStep}）` : `${p.flow[idx]}を通過した（内定）`;
+    html += `<button class="btn primary wide" data-pass="${key}">${esc(label)}</button>`;
+  }
+  if (s === "todo" && /面接/.test(p.step)) {
+    html += `<a class="btn ghost wide" href="#/doc/${encodeURIComponent("profile/08_面接想定問答.md")}">面接の想定問答を開く</a>`;
+  } else if ((s === "todo" || s === "plan") && (/ES|書類|エントリー/.test(p.step) || s === "plan")) {
+    html += `<a class="btn ghost wide" href="#/doc/${encodeURIComponent(hasNote(c.slug) ? `notes/${c.slug}.md` : "profile/README.md")}">ESの${hasNote(c.slug) ? "下書き" : "素材"}を開く</a>`;
   }
 
   if (p.process) html += `<h3 class="sub">選考プロセス</h3><div class="md prog-process">${renderMarkdown(p.process)}</div>`;
@@ -860,6 +903,65 @@ function programPanel(c, p) {
   ].filter(Boolean);
   if (links.length) html += `<p class="prog-links">${links.join("")}</p>`;
   return html + `</section>`;
+}
+
+function statusSheet(key) {
+  const [slug, pid] = key.split(":");
+  const c = bySlug(slug);
+  const p = programOf(c, pid);
+  if (!p) return "";
+  return `
+    <form method="dialog" class="sheet-inner">
+      <p class="sheet-title">${esc(c.name)}<small>${esc(p.title || p.kind)}</small></p>
+      ${STATE_GROUPS.map((g) => `
+        <p class="sheet-group">${g.label}</p>
+        <div class="sheet-options">
+          ${g.states.map((st) => `<button type="button" class="sheet-opt${st === p.state ? " current" : ""}" data-state="${esc(slug)}:${esc(pid)}:${st}">
+            ${statePill(st)}<span>${esc(STATES[st].hint)}</span>${st === p.state ? '<em>いま</em>' : ""}</button>`).join("")}
+        </div>`).join("")}
+      <button class="btn wide" value="cancel">閉じる</button>
+    </form>`;
+}
+
+function openSheet(key) {
+  let dlg = document.getElementById("status-sheet");
+  if (!dlg) {
+    dlg = document.createElement("dialog");
+    dlg.id = "status-sheet";
+    dlg.className = "sheet-dialog";
+    dlg.addEventListener("click", (ev) => { if (ev.target === dlg) dlg.close(); });
+    document.body.append(dlg);
+  }
+  dlg.innerHTML = statusSheet(key);
+  dlg.showModal();
+}
+
+// 一覧から「応募予定にする」「見送る」: 気になる状態のルートをまとめて変える
+async function triage(slug, to) {
+  const c = bySlug(slug);
+  if (!c) return;
+  const targets = c.programs.filter((p) => p.state === "watch").map((p) => p.id);
+  const ids = targets.length ? targets : c.programs.map((p) => p.id);
+  const note = to === "plan" ? "応募予定にした" : "見送りにした";
+  const ok = await commit(() => {
+    const x = bySlug(slug);
+    if (!x) return;
+    for (const p of x.programs) if (ids.includes(p.id)) p.state = to;
+    x.lastAction = isoToday();
+    x.history = [{ date: isoToday(), text: note }, ...(x.history || [])];
+  }, `${c.name}: ${note}`, { quiet: true });
+  render();
+  if (!ok) return;
+  undoable(`${c.name}を${to === "plan" ? "応募予定" : "見送り"}にしました`, async () => {
+    await commit(() => {
+      const x = bySlug(slug);
+      if (!x) return;
+      for (const p of x.programs) if (ids.includes(p.id)) p.state = "watch";
+      const i = (x.history || []).findIndex((h) => h.text === note);
+      if (i >= 0) x.history.splice(i, 1);
+    }, `${c.name}: 取り消し（${note}）`);
+    render();
+  }, ok);
 }
 
 function viewCompany(slug, pid) {
@@ -895,7 +997,7 @@ function viewCompany(slug, pid) {
   if (c.programs.length > 1) {
     html += `<div class="prog-tabs" role="tablist">${c.programs
       .map((q) => `<a role="tab" href="#/c/${esc(c.slug)}/${esc(q.id)}" aria-selected="${q.id === p.id}">
-        ${kindBadge(q.kind)}<span class="pt-title">${esc(q.title || q.kind)}</span><span class="pt-state">${STATES[q.state].label}</span></a>`)
+        ${kindBadge(q.kind)}<span class="pt-title">${esc(q.title || q.kind)}</span><span class="pt-state">${statePill(q.state)}</span></a>`)
       .join("")}</div>`;
   }
   html += p
@@ -1434,6 +1536,11 @@ function afterRender(name, sub) {
     box.addEventListener("input", () => {
       ui.cq = box.value;
       document.getElementById("co-results").innerHTML = companyRows();
+      const pool = companyPool();
+      document.querySelectorAll(".ctabs button").forEach((b) => {
+        const t = COMPANY_TABS.find((x) => x.v === b.dataset.ctab);
+        b.querySelector("span").textContent = pool.filter((c) => t.test(companyState(c))).length;
+      });
     });
   }
 }
@@ -1540,12 +1647,13 @@ async function updateProgram(slug, pid, patch, note) {
 }
 
 function statusClick(t) {
+  document.getElementById("status-sheet")?.close();
   if (t.dataset.state) {
     const [slug, pid, next] = t.dataset.state.split(":");
     const p = programOf(bySlug(slug), pid);
     if (!p || p.state === next) return;
     if (ENDED.has(next) && !confirm(`「${STATES[next].label}」にします。`)) return;
-    const note = next === "todo" && !LIVE.includes(p.state) ? "選考中に戻した" : `「${STATES[next].label}」にした`;
+    const note = IN_SELECTION.has(next) && ENDED.has(p.state) ? "選考中に戻した" : `「${STATES[next].label}」にした`;
     return updateProgram(slug, pid, { state: next }, note);
   }
   if (t.dataset.step) {
@@ -1554,14 +1662,16 @@ function statusClick(t) {
     const step = p.flow[Number(i)];
     if (p.step === step) return;
     const patch = { step };
-    if (!LIVE.includes(p.state) || p.state === "before") patch.state = "todo";
+    if (!IN_SELECTION.has(p.state)) patch.state = "todo";
     return updateProgram(slug, pid, patch, `段階を「${step}」にした`);
   }
   if (t.dataset.pass) {
     const [slug, pid] = t.dataset.pass.split(":");
     const p = programOf(bySlug(slug), pid);
     const idx = flowIndex(p);
-    if (idx < 0) return updateProgram(slug, pid, { step: p.flow[0], state: "todo" }, `選考を始めた（${p.flow[0]}）`);
+    if (!IN_SELECTION.has(p.state) || idx < 0) {
+      return updateProgram(slug, pid, { step: p.flow[0] || "", state: "todo" }, `応募した${p.flow[0] ? `（${p.flow[0]}）` : ""}`);
+    }
     if (idx + 1 < p.flow.length) return updateProgram(slug, pid, { step: p.flow[idx + 1], state: "todo" }, `${p.flow[idx]}を通過した`);
     return updateProgram(slug, pid, { state: "offer" }, `${p.flow[idx]}を通過して内定`);
   }
@@ -1589,6 +1699,21 @@ document.addEventListener("click", async (ev) => {
   if (t.dataset.copy !== undefined) return copy(t.dataset.copy, t.dataset.copyLabel);
   if (t.dataset.done) return markDone(t.dataset.done);
   if (t.dataset.state || t.dataset.step || t.dataset.pass) return statusClick(t);
+  if (t.dataset.sheet) return openSheet(t.dataset.sheet);
+  if (t.dataset.triage) {
+    const [slug, to] = t.dataset.triage.split(":");
+    return triage(slug, to);
+  }
+  if (t.dataset.ctab) {
+    ui.ctab = t.dataset.ctab;
+    store.set("jh.ctab", ui.ctab);
+    return render();
+  }
+  if (t.dataset.calall !== undefined) {
+    ui.calAll = t.dataset.calall === "1";
+    store.set("jh.calAll", ui.calAll ? "1" : "0");
+    return render();
+  }
   if (t.dataset.prio) {
     const [slug, n] = t.dataset.prio.split(":");
     const c = bySlug(slug);
@@ -1681,6 +1806,14 @@ document.addEventListener("click", async (ev) => {
   }
 });
 
+// ホームの件数から、そのタブを開いた企業一覧へ
+document.addEventListener("click", (ev) => {
+  const a = ev.target.closest("[data-goto-tab]");
+  if (!a) return;
+  ui.ctab = a.dataset.gotoTab;
+  store.set("jh.ctab", ui.ctab);
+}, true);
+
 document.addEventListener("change", (ev) => {
   const t = ev.target;
   if (t.dataset.toggle) return markDone(t.dataset.toggle, t.checked);
@@ -1745,7 +1878,7 @@ document.addEventListener("submit", async (ev) => {
       // 状況と段階はフォームにないので、同じ id の選考ルートから引き継ぐ
       const programs = data.programs.map((p) => {
         const old = programOf(c, p.id);
-        return { ...p, state: old?.state || "before", step: old?.step || "" };
+        return { ...p, state: old?.state || "watch", step: old?.step || "" };
       });
       Object.assign(c, structuredClone({ ...data, programs }));
       if (!c.salary) delete c.salary;
