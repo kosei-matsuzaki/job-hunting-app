@@ -1,6 +1,6 @@
 // アプリの画面だけを端末に残し、電波がなくても開けるようにする。
 // GitHub API（データ）は扱わない。データの控えは app.js が端末内に持つ。
-const CACHE = "shukatsu-board-v5";
+const CACHE = "shukatsu-board-v6";
 const SHELL = ["./", "index.html", "app.js", "md.js", "style.css", "icon.svg", "manifest.webmanifest"];
 const FONT_HOSTS = ["fonts.googleapis.com", "fonts.gstatic.com"];
 

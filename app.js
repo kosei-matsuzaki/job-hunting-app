@@ -568,7 +568,8 @@ function viewHome() {
     </header>
     <nav class="tally" aria-label="企業の状況">
       ${["active", "plan", "watch"].map((v) => `<a href="#/companies" data-goto-tab="${v}" class="tally-item ${v}"><b>${count(v)}</b>${COMPANY_TABS.find((x) => x.v === v).label}</a>`).join("")}
-    </nav>`;
+    </nav>
+    <div class="dash"><div class="dash-main">`;
 
   // 説明会より、応募（本選考・インターン）の締切を先に出す
   const next = upcoming.find((e) => e.p?.kind !== "説明会・イベント") || upcoming[0];
@@ -594,7 +595,7 @@ function viewHome() {
   }
 
   // 1週間の帯
-  html += `<ol class="week-strip" aria-label="今週">`;
+  html += `<section class="card week-card"><h2 class="card-title">この1週間<a class="sec-link" href="#/calendar">カレンダー</a></h2><ol class="week-strip" aria-label="今週">`;
   for (let i = 0; i < 7; i++) {
     const d = addDays(t, i);
     const iso = isoOf(d);
@@ -615,17 +616,21 @@ function viewHome() {
       html += `<h2 class="day-head ${urgency(daysUntil(iso))}">${esc(dayLabel(iso))}</h2><ul class="ev-list">${evs.map((e) => eventRow(e)).join("")}</ul>`;
     }
     html += `</section>`;
+  } else {
+    html += `<p class="hint week-empty">この1週間に予定はありません。</p>`;
   }
+  html += `</section>`;
   const later = upcoming.filter((e) => daysUntil(e.date) > 6).slice(0, 5);
   if (later.length) {
-    html += `<h2 class="sec">その先の予定<a class="sec-link" href="#/calendar">カレンダー</a></h2><ul class="ev-list plain">${later.map((e) => eventRow(e, { date: true })).join("")}</ul>`;
+    html += `<section class="card"><h2 class="sec">その先の予定<a class="sec-link" href="#/calendar">カレンダー</a></h2><ul class="ev-list plain">${later.map((e) => eventRow(e, { date: true })).join("")}</ul></section>`;
   }
   if (watchSoon.length) {
     html += `<a class="notice-link" href="#/companies" data-goto-tab="watch">「気になる」企業に、2週間以内の締切が${watchSoon.length}件（${watchSoonCompanies}社）あります<span>見る</span></a>`;
   }
+  html += `</div><div class="dash-side">`;
 
   if (active.length) {
-    html += `<h2 class="sec">選考中</h2><ul class="active-list">`;
+    html += `<section class="card"><h2 class="sec">選考中<span class="count">${active.length}</span></h2><ul class="active-list">`;
     for (const { c, p, nx } of active) {
       html += `
         <li><a class="active-row" href="#/c/${esc(c.slug)}/${esc(p.id)}">
@@ -637,25 +642,25 @@ function viewHome() {
           </span>
         </a></li>`;
     }
-    html += `</ul>`;
+    html += `</ul></section>`;
   }
 
   if (overdue.length) {
-    html += `<h2 class="sec">期限が過ぎた予定<span class="count">${overdue.length}</span></h2>
+    html += `<section class="card"><h2 class="sec">期限が過ぎた予定<span class="count">${overdue.length}</span></h2>
       <p class="hint">終わっていたら ✓ を押すと消えます。</p>
-      <ul class="ev-list plain">${overdue.map((e) => eventRow(e, { date: true })).join("")}</ul>`;
+      <ul class="ev-list plain">${overdue.map((e) => eventRow(e, { date: true })).join("")}</ul></section>`;
   }
 
   const todos = state.companies.filter((c) => c.todo.length && isTracked(c));
   if (todos.length) {
     const total = todos.reduce((n, c) => n + c.todo.length, 0);
-    html += `<details class="todos"><summary>調べること・転記すること<span class="count">${total}</span></summary><ul>`;
+    html += `<details class="todos card"><summary>調べること・転記すること<span class="count">${total}</span></summary><ul>`;
     for (const c of todos) {
       html += `<li><a href="#/c/${esc(c.slug)}">${esc(c.name)}</a><ul>${c.todo.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></li>`;
     }
     html += `</ul></details>`;
   }
-  return html;
+  return html + `</div></div>`;
 }
 
 // =====================================================================
@@ -681,6 +686,7 @@ function viewCalendar(sel) {
   const next = isoOf(new Date(y, m + 1, 1));
 
   let html = `
+    <div class="cal-layout"><div class="cal-col">
     <header class="cal-head">
       <a class="icon-btn" href="#/calendar/${prev}" aria-label="前の月">‹</a>
       <h1 class="page-title">${y}年${m + 1}月</h1>
@@ -709,13 +715,20 @@ function viewCalendar(sel) {
         .slice(0, 3)
         .map((e) => `<i class="${e.done ? "done" : e.kind === "event" ? "event" : "deadline"}"></i>`)
         .join("");
+      // 広い画面では点の代わりに企業名を出す
+      const chips = evs
+        .slice(0, 3)
+        .map((e) => `<span class="cal-ev ${e.done ? "done" : e.kind === "event" ? "event" : "deadline"}">${esc(e.c.name)}</span>`)
+        .join("");
       html += `<a role="gridcell" class="cal-cell ${cls}" href="#/calendar/${iso}" aria-label="${esc(fmtDate(iso, true))} 予定${evs.length}件"${iso === selected ? ' aria-selected="true"' : ""}>
-        <span class="cal-d">${day.getDate()}</span><span class="cal-dots">${dots}${evs.length > 3 ? "<b>+</b>" : ""}</span></a>`;
+        <span class="cal-d">${day.getDate()}</span><span class="cal-dots">${dots}${evs.length > 3 ? "<b>+</b>" : ""}</span>
+        ${evs.length ? `<span class="cal-evs">${chips}${evs.length > 3 ? `<b>ほか${evs.length - 3}件</b>` : ""}</span>` : ""}</a>`;
     }
     html += `</div>`;
   }
   html += `</div>
-    <p class="cal-legend"><i class="deadline"></i>締切 <i class="event"></i>日程 <i class="done"></i>済み</p>`;
+    <p class="cal-legend"><i class="deadline"></i>締切 <i class="event"></i>日程 <i class="done"></i>済み</p>
+    </div><div class="cal-aside">`;
 
   const dayEvents = (byDate.get(selected) || []).sort(byWhen);
   html += `<section class="sheet day-sheet">
@@ -730,7 +743,7 @@ function viewCalendar(sel) {
       .map((e) => eventRow(e, { date: true }))
       .join("")}</ul>`;
   }
-  html += `<div class="fab-space"></div><a class="fab" href="#/add/${selected}" aria-label="予定を追加">${ICONS.plus}</a>`;
+  html += `</div></div><div class="fab-space"></div><a class="fab" href="#/add/${selected}" aria-label="予定を追加">${ICONS.plus}</a>`;
   return html;
 }
 
@@ -817,6 +830,7 @@ function viewCompanies() {
       <h1 class="page-title">企業<span class="count">${state.companies.length}社</span></h1>
       <a class="btn" href="#/new">${ICONS.plus}追加</a>
     </header>
+    <div class="co-controls">
     <div class="ctabs" role="tablist" aria-label="状況">
       ${COMPANY_TABS.map((t) => `<button role="tab" data-ctab="${t.v}" aria-selected="${t.v === tab}">${t.label}<span>${pool.filter((c) => t.test(companyState(c))).length}</span></button>`).join("")}
     </div>
@@ -826,6 +840,7 @@ function viewCompanies() {
     </div>
     <div class="chips" role="group" aria-label="業界">
       ${["", ...industries].map((i) => `<button data-filter="${esc(i)}" aria-pressed="${ui.industry === i}">${i ? `<i class="ind-dot ${IND_CLASS[i] || "other"}"></i>${esc(i)}<span>${counts[i]}</span>` : "すべての業界"}</button>`).join("")}
+    </div>
     </div>
     <div id="co-results">${companyRows()}</div>`;
 }
@@ -992,7 +1007,8 @@ function viewCompany(slug, pid) {
       ${m.url ? `<a class="qa" href="${esc(m.url)}" target="_blank" rel="noopener noreferrer">${ICONS.door}<span>マイページ</span></a>` : `<a class="qa muted" href="#/c/${esc(c.slug)}/edit">${ICONS.door}<span>マイページ未登録</span></a>`}
       ${m.id ? `<button class="qa" data-copy="${esc(m.id)}" data-copy-label="ID">${ICONS.id}<span>IDをコピー</span></button>` : ""}
       ${m.password ? `<button class="qa" data-copy="${esc(m.password)}" data-copy-label="パスワード">${ICONS.key}<span>PWをコピー</span></button>` : ""}
-    </nav>`;
+    </nav>
+    <div class="co-layout"><div class="co-main">`;
 
   if (c.programs.length > 1) {
     html += `<div class="prog-tabs" role="tablist">${c.programs
@@ -1005,7 +1021,7 @@ function viewCompany(slug, pid) {
     : `<section class="empty-panel">選考ルート（本選考・インターンなど）が登録されていません。<a href="#/c/${esc(c.slug)}/edit">編集から追加</a></section>`;
 
   const events = c.events.map((e, i) => ({ ...e, c, i, p: programOf(c, e.program) })).sort(byWhen);
-  html += `<h2 class="sec">予定<a class="sec-link" href="#/add?c=${esc(c.slug)}">追加</a></h2>`;
+  html += `</div><div class="co-side"><section class="card"><h2 class="sec">予定<a class="sec-link" href="#/add?c=${esc(c.slug)}">追加</a></h2>`;
   if (events.length) {
     html += `<ul class="checklist">`;
     for (const e of events) {
@@ -1023,27 +1039,29 @@ function viewCompany(slug, pid) {
   } else {
     html += `<p class="hint">予定はまだありません。</p>`;
   }
+  html += `</section>`;
 
-  if (c.todo.length) html += `<h2 class="sec">調べること・転記すること</h2><ul class="plain-list">${c.todo.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>`;
+  if (c.todo.length) html += `<section class="card"><h2 class="sec">調べること・転記すること</h2><ul class="plain-list">${c.todo.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></section>`;
   if (c.links.length) {
-    html += `<h2 class="sec">リンク</h2><ul class="plain-list">${c.links
+    html += `<section class="card"><h2 class="sec">リンク</h2><ul class="plain-list">${c.links
       .map((l) => `<li><a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.label || l.url)}</a></li>`)
-      .join("")}</ul>`;
+      .join("")}</ul></section>`;
   }
-  html += `<h2 class="sec">企業研究・ES下書き</h2>`;
+  html += `<section class="card"><h2 class="sec">企業研究・ES下書き</h2>`;
   html += hasNote(c.slug)
     ? `<a class="btn ghost wide" href="#/doc/${encodeURIComponent(`notes/${c.slug}.md`)}">ノートを開く</a>`
     : state.docs
       ? `<button class="btn ghost wide" data-newnote="${esc(c.slug)}">ノートを作る</button>`
       : `<p class="hint">読み込み中…</p>`;
-  if (c.memo?.trim()) html += `<h2 class="sec">メモ</h2><div class="md">${renderMarkdown(c.memo)}</div>`;
+  html += `</section></div><div class="co-extra">`;
+  if (c.memo?.trim()) html += `<section class="card"><h2 class="sec">メモ</h2><div class="md">${renderMarkdown(c.memo)}</div></section>`;
   if (c.history.length) {
-    html += `<h2 class="sec">これまでの記録</h2><ol class="history">${c.history
+    html += `<section class="card"><h2 class="sec">これまでの記録</h2><ol class="history">${c.history
       .slice(0, 30)
       .map((h) => `<li><span class="h-date">${esc(fmtDate(h.date))}</span>${esc(h.text)}</li>`)
-      .join("")}</ol>`;
+      .join("")}</ol></section>`;
   }
-  return html;
+  return html + `</div></div>`;
 }
 
 // =====================================================================
@@ -1300,6 +1318,7 @@ function viewDoc(path, doc) {
   let html = `
     <a class="back" href="#/docs">素材</a>
     <div class="doc-head"><span class="doc-path">${esc(path)}${doc.offline ? "（端末の控え）" : ""}</span><a class="icon-btn" href="#/doc/${encodeURIComponent(path)}/edit" aria-label="編集">${ICONS.edit}</a></div>
+    <div class="doc-layout${toc ? " has-toc" : ""}">
     ${toc}
     <article class="md">`;
   for (const s of sections) {
@@ -1320,7 +1339,7 @@ function viewDoc(path, doc) {
     }
     html += s.blocks.map((b) => b.html).join("");
   }
-  return html + `</article>`;
+  return html + `</article></div>`;
 }
 
 function viewDocEdit(path, doc) {
@@ -1454,9 +1473,11 @@ function route() {
 }
 
 function renderChrome() {
-  const [name] = route().parts;
+  const [name, , sub] = route().parts;
   const tab = { c: "companies", new: "companies", doc: "docs", add: "calendar", schedule: "home" }[name] || name;
   document.querySelectorAll(".tabs a").forEach((a) => a.toggleAttribute("aria-current", a.dataset.tab === tab));
+  // 画面ごとに幅を変える（フォームや文章は読みやすい幅、一覧やダッシュボードは広く）
+  $view().dataset.view = sub === "edit" ? "form" : { new: "form", add: "form", settings: "form", search: "form" }[name] || name || "home";
   document.getElementById("reload").classList.toggle("spinning", state.loading);
   document.body.classList.toggle("signed-out", !cfg.token);
 }
