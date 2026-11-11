@@ -7,6 +7,7 @@ import { googleCalUrl } from "../ics.js";
 import { esc, renderMarkdown } from "../md.js";
 import { bySlug, byWhen, defaultProgram, flowIndex, nextEvent, programOf } from "../model.js";
 import { avatar, eventTitle, ICONS, kindBadge, statePill } from "../parts.js";
+import { companyPieces } from "./docs.js";
 import { state } from "../store.js";
 
 function programPanel(c, p) {
@@ -65,9 +66,11 @@ function programPanel(c, p) {
     html += `<button class="btn primary wide" data-pass="${key}">${esc(label)}</button>`;
   }
   if (s === "todo" && /面接/.test(p.step)) {
-    html += `<a class="btn ghost wide" href="#/doc/${encodeURIComponent("profile/08_面接想定問答.md")}">面接の想定問答を開く</a>`;
+    html += `<a class="btn ghost wide" href="#/doc/${encodeURIComponent("profile/面接.md")}">面接の想定問答を開く</a>`;
   } else if ((s === "todo" || s === "plan") && (/ES|書類|エントリー/.test(p.step) || s === "plan")) {
-    html += `<a class="btn ghost wide" href="#/doc/${encodeURIComponent(hasNote(c.slug) ? `notes/${c.slug}.md` : "profile/README.md")}">ESの${hasNote(c.slug) ? "下書き" : "素材"}を開く</a>`;
+    html += hasNote(c.slug)
+      ? `<a class="btn ghost wide" href="#/doc/${encodeURIComponent(`notes/${c.slug}.md`)}">ESの下書きを開く</a>`
+      : `<a class="btn ghost wide" href="#/docs">ESの素材を開く</a>`;
   }
 
   if (p.process) html += `<h3 class="sub">選考プロセス</h3><div class="md prog-process">${renderMarkdown(p.process)}</div>`;
@@ -109,6 +112,21 @@ export function openSheet(key) {
   }
   dlg.innerHTML = statusSheet(key);
   dlg.showModal();
+}
+
+// ノートの「## ES」に書いた設問の一覧（ルートごと）
+function esList(c) {
+  const list = companyPieces(c.slug);
+  if (!list) return `<p class="hint">読み込み中…</p>`;
+  if (!list.length) return `<p class="hint">ESの設問はまだ書かれていません。</p>`;
+  const routes = [...new Set(list.map((x) => x.route))];
+  const mark = { sent: '<span class="sent">提出</span>', old: '<span class="tag">以前の版</span>', draft: '<span class="tag draft">下書き</span>' };
+  return routes
+    .map((r) => `${r ? `<h3 class="sub">${esc(r)}</h3>` : ""}<ul class="es-list">${list
+      .filter((x) => x.route === r)
+      .map((x) => `<li><span class="es-q">${esc(x.title)}</span><span class="es-meta">${mark[x.state]}<span class="chars">${x.chars}字${x.limit ? `<small>／${esc(x.limit)}</small>` : ""}</span><button class="mini" data-copy="${esc(x.text)}">コピー</button></span></li>`)
+      .join("")}</ul>`)
+    .join("");
 }
 
 export function viewCompany(slug, pid) {
@@ -179,9 +197,9 @@ export function viewCompany(slug, pid) {
       .map((l) => `<li><a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.label || l.url)}</a></li>`)
       .join("")}</ul></section>`;
   }
-  html += `<section class="card"><h2 class="sec">企業研究・ES下書き</h2>`;
+  html += `<section class="card"><h2 class="sec">ES・企業研究</h2>`;
   html += hasNote(c.slug)
-    ? `<a class="btn ghost wide" href="#/doc/${encodeURIComponent(`notes/${c.slug}.md`)}">ノートを開く</a>`
+    ? esList(c) + `<a class="btn ghost wide" href="#/doc/${encodeURIComponent(`notes/${c.slug}.md`)}">ノートを開く</a>`
     : state.docs
       ? `<button class="btn ghost wide" data-newnote="${esc(c.slug)}">ノートを作る</button>`
       : `<p class="hint">読み込み中…</p>`;

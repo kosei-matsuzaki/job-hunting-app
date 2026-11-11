@@ -87,10 +87,10 @@
 }
 .topic-tabs a[aria-current] { border-color: var(--ink); background: var(--ink); color: var(--paper); font-weight: 700; }
 .pieces { margin: 0; padding: 0; list-style: none; }
-.piece { padding: 10px 0 8px; border-bottom: 1px solid var(--rule); }
-.piece.old { opacity: 0.72; }
+.piece { min-width: 0; padding: 10px 0 8px; border-bottom: 1px solid var(--rule); }
+.piece.is-old { opacity: 0.72; }
 .piece-top { display: flex; align-items: center; gap: 10px; }
-.piece-src { display: flex; flex: 1; align-items: center; gap: 8px; min-width: 0; font-size: 0.8125rem; }
+.piece-src { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; font-size: 0.8125rem; }
 .piece-src a { color: var(--muted); }
 .piece-src .avatar.sm { width: 24px; height: 24px; border-width: 1.5px; font-size: 0.6875rem; }
 .piece details { margin-top: 4px; }
@@ -101,6 +101,56 @@
 .piece details[open] .piece-pre { display: none; }
 .piece summary:hover .piece-title { text-decoration: underline; text-underline-offset: 3px; }
 .piece .md { margin-top: 8px; padding: 10px 12px 2px; border-left: 2px solid var(--ink); background: var(--sheet); font-size: 0.9375rem; }
+
+/* ESの文章の情報の行（種類・字数・状態・ルート・話） */
+.meta { display: flex; flex-wrap: wrap; gap: 4px 6px; margin: -2px 0 10px; }
+.meta span { display: inline-flex; align-items: baseline; gap: 4px; padding: 1px 8px; border: 1px solid var(--rule); border-radius: 4px; background: var(--sheet); font-size: 0.75rem; }
+.meta i { color: var(--faint); font-style: normal; font-size: 0.6875rem; }
+.tag.draft { border: 1px dashed var(--faint); background: none; color: var(--muted); }
+.chars small { margin-left: 1px; color: var(--faint); font-family: var(--font); font-size: 0.6875rem; }
+.piece-src small { color: var(--muted); font-size: 0.75rem; }
+.piece-src .base-src { color: var(--ink); font-weight: 700; }
+.piece.is-base { border-left: 3px solid var(--ink); padding-left: 10px; }
+.piece-eps { display: flex; gap: 4px; margin: 6px 0 0; }
+.piece-eps a, .ep-id {
+  padding: 0 6px;
+  border-radius: 3px;
+  background: var(--sheet-2);
+  color: var(--muted);
+  font-family: var(--num);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* 絞り込み: 字数（近い順に並べ替え）と話 */
+.filters { display: flex; flex-direction: column; gap: 6px; margin: 12px 0 4px; }
+.chips { display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chips-label { flex: none; width: 2.5em; color: var(--muted); font-size: 0.75rem; }
+.chip {
+  flex: none;
+  padding: 3px 11px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--sheet);
+  color: var(--ink);
+  font-family: var(--num);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+.chip[aria-current] { border-color: var(--ink); background: var(--ink); color: var(--paper); font-weight: 600; }
+
+/* 話（エピソード）の一覧 */
+.eps { margin: 6px 0 0; padding: 0; list-style: none; }
+.eps a { display: flex; align-items: baseline; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--rule); color: var(--ink); text-decoration: none; }
+.eps a:hover .ep-title { text-decoration: underline; text-underline-offset: 3px; }
+.eps .ep-id { flex: none; min-width: 2.6em; text-align: center; color: var(--ink); }
+.ep-title { flex: 1; min-width: 0; }
+.ep-n { display: flex; gap: 10px; color: var(--muted); font-size: 0.75rem; white-space: nowrap; }
+.ep-n b { color: var(--ink); font-family: var(--num); font-size: 1rem; font-weight: 600; }
+.page-title .ep-id { margin-right: 10px; padding: 0 8px; font-size: 1.25rem; color: var(--ink); vertical-align: 3px; }
 
 /* 企業ノートの上に出す企業 */
 .doc-co {
@@ -219,7 +269,7 @@
 
 @media (min-width: 760px) {
   .doc-list { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); column-gap: 24px; }
-  .topics { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .topics { grid-template-columns: repeat(4, 1fr); gap: 12px; }
   .topic-tabs { margin: 0 0 4px; padding: 0; }
 
   .toc { flex-wrap: wrap; overflow: visible; margin: 6px 0 4px; padding: 4px 0 8px; }
@@ -227,7 +277,8 @@
 
 @media (min-width: 1024px) {
   .notes { display: grid; grid-template-columns: 1fr 1fr; column-gap: 28px; }
-  .topic-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 36px; align-items: start; }
+  .eps { display: grid; grid-template-columns: 1fr 1fr; column-gap: 28px; }
+  .pieces { max-width: 860px; }
   /* 素材: 目次を左に固定 */
   .doc-layout.has-toc { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 36px; align-items: start; }
   .doc-layout .toc {

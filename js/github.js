@@ -55,7 +55,9 @@ export async function writeFile(path, text, sha, message) {
 export async function listDocs(dir) {
   try {
     const files = await api(`contents/${encPath(dir)}`);
-    return files.filter((f) => f.type === "file" && f.name.endsWith(".md")).map((f) => f.path);
+    // 下のフォルダ（profile/回答 など）もたどる
+    const subs = await Promise.all(files.filter((f) => f.type === "dir").map((f) => listDocs(f.path)));
+    return [...files.filter((f) => f.type === "file" && f.name.endsWith(".md")).map((f) => f.path), ...subs.flat()];
   } catch (e) {
     if (e.status === 404) return [];
     throw e;

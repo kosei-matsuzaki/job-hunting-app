@@ -112,7 +112,8 @@ document.addEventListener("click", async (ev) => {
   if (t.dataset.newnote) {
     const c = bySlug(t.dataset.newnote);
     const path = `notes/${c.slug}.md`;
-    const text = `# ${c.name}\n\n## 企業研究\n\n- \n\n## 提出したES\n\n## 面接で聞かれたこと\n`;
+    // 形は profile/README.md の「ESの記録の仕方」
+    const text = `# ${c.name}\n\n## 企業研究\n\n- \n\n## ES\n\n### 設問をここに書く\n\n> 種類: ガクチカ｜字数: 400字以内｜状態: 下書き｜ルート: 本選考｜話: E1\n\n## 面接\n\n## 参考\n`;
     t.disabled = true;
     try {
       const sha = await writeFile(path, text, null, `${c.name} のノートを作成`);

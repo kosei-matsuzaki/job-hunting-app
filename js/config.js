@@ -11,16 +11,19 @@ export const DOC_GROUPS = [
 
 export const EXTRA_DOCS = [{ path: "links.md", name: "就活サイト・対策" }];
 
-// 素材を設問の種類でまとめる。files は profile/ の土台、words は各社ノートの見出しを振り分ける言葉
-// 見出しは上から順に当てはめる（「研究室で取り組んだ」は研究、「苦労した経験」はガクチカ）
+// 素材を設問の種類でまとめる。name は ES の情報の行の「種類」、files は profile/ にある土台
 export const TOPICS = [
-  { key: "research", name: "研究", ask: "研究内容・卒業研究・学んでいること", files: ["profile/04_研究.md"], words: ["研究", "ゼミ", "学んでいる", "論文", "学会"] },
-  { key: "motive", name: "志望動機", ask: "志望理由・なぜこの会社か・入社後にやりたいこと", files: ["profile/07_志望動機.md"], words: ["志望", "理由", "なぜ", "やりたい", "したい", "実現", "果たしたい", "求める", "興味", "大切に"] },
-  { key: "pr", name: "自己PR・強み", ask: "自己PR・強み・人柄", files: ["profile/03_自己PR.md"], words: ["自己PR", "強み", "Growth"] },
-  { key: "team", name: "チーム", ask: "チームでの経験・リーダー経験", files: ["profile/06_サークル.md"], words: ["チーム", "サークル", "リーダー"] },
-  { key: "gakuchika", name: "ガクチカ・挑戦", ask: "力を入れたこと・困難を乗り越えた経験・挑戦", files: ["profile/02_ガクチカ.md"], words: ["力を入れ", "打ち込", "挑戦", "困難", "苦労", "挫折", "取り組んだ"] },
-  { key: "skill", name: "経験・スキル", ask: "インターン・開発経験・言語・制作物", files: ["profile/05_インターン・開発経験.md", "profile/01_基本情報.md"], words: ["経験", "スキル", "言語", "ツール", "制作", "URL", "資格", "開発"] },
+  { key: "gakuchika", name: "ガクチカ", ask: "学生時代に力を入れたこと・挑戦", files: ["profile/回答/ガクチカ.md"] },
+  { key: "hardship", name: "困難・挫折", ask: "苦労した経験・困難をどう乗り越えたか", files: [] },
+  { key: "pr", name: "自己PR", ask: "自己PR・強み・人柄", files: ["profile/回答/自己PR.md"] },
+  { key: "team", name: "チーム", ask: "チームでの経験・リーダー経験", files: ["profile/回答/チーム.md"] },
+  { key: "research", name: "研究", ask: "研究内容・卒業研究・学んでいること", files: ["profile/回答/研究.md"] },
+  { key: "motive", name: "志望動機", ask: "志望理由・なぜこの会社か・入社後にやりたいこと", files: ["profile/回答/志望動機.md"] },
+  { key: "skill", name: "経験・スキル", ask: "インターン・開発経験・言語・制作物", files: ["profile/回答/経験・スキル.md", "profile/基本情報.md"] },
+  { key: "other", name: "その他", ask: "参加理由・興味のある技術・URL など", files: [] },
 ];
+
+export const EPISODES_PATH = "profile/エピソード.md";
 
 // 選考ルートごとの状況。step は選考フローの中のいまの段階
 // 「気になる → 応募予定 → 選考中（対応中・結果待ち） → 内定」と進み、途中で終わったら「終了」

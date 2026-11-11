@@ -56,6 +56,14 @@ function splitRow(line) {
     .map((c) => c.trim().replace(/\\\|/g, "|"));
 }
 
+// ESの文章の情報の行: 「> 種類: ガクチカ｜字数: 200字以内｜状態: 提出 2026-10-30｜ルート: 早期選考｜話: E1」
+const META_KEYS = ["種類", "字数", "状態", "ルート", "話"];
+export function parseMeta(line) {
+  const pairs = line.split("｜").map((x) => x.match(/^\s*([^:：]+)[:：]\s*(.*?)\s*$/));
+  if (!pairs.every((m) => m && META_KEYS.includes(m[1]))) return null;
+  return Object.fromEntries(pairs.map((m) => [m[1], m[2]]));
+}
+
 const LIST_RE = /^(\s*)([-*]|\d+\.)\s+(.*)$/;
 
 function renderList(items, ctx) {
@@ -130,6 +138,11 @@ export function parseMarkdown(text, ctx = {}) {
     if (line.trimStart().startsWith(">")) {
       const body = [];
       while (i < lines.length && lines[i].trimStart().startsWith(">")) body.push(lines[i++].trimStart().replace(/^>\s?/, ""));
+      const meta = body.length === 1 && parseMeta(body[0]);
+      if (meta) {
+        blocks.push({ type: "meta", meta, text: "", html: `<p class="meta">${Object.entries(meta).map(([k, v]) => `<span><i>${esc(k)}</i>${esc(v)}</span>`).join("")}</p>` });
+        continue;
+      }
       blocks.push({ type: "quote", text: body.join("\n"), html: `<blockquote>${body.map((b) => inline(b, ctx)).join("<br>")}</blockquote>` });
       continue;
     }

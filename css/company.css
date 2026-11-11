@@ -252,3 +252,9 @@
   .co-extra { grid-area: extra; }
   .co-hero .page-title { font-size: 2rem; }
 }
+
+/* 企業ページのESの一覧 */
+.es-list { margin: 0 0 6px; padding: 0; list-style: none; }
+.es-list li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 10px; padding: 8px 0; border-bottom: 1px solid var(--rule); }
+.es-q { flex: 1 1 14em; font-size: 0.875rem; }
+.es-meta { display: flex; align-items: center; gap: 8px; }

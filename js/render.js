@@ -1,7 +1,7 @@
 // 描画とルーティング
 
 import { COMPANY_TABS } from "./config.js";
-import { getDoc, loadAllDocs } from "./data.js";
+import { getDoc, hasNote, loadAllDocs } from "./data.js";
 import { explain } from "./github.js";
 import { esc } from "./md.js";
 import { companyState } from "./model.js";
@@ -9,7 +9,7 @@ import { cfg, state, store, ui } from "./store.js";
 import { viewCalendar } from "./views/calendar.js";
 import { companyPool, companyRows, viewCompanies } from "./views/companies.js";
 import { viewCompany } from "./views/company.js";
-import { bindDocCounter, viewDoc, viewDocEdit, viewDocs, viewTopic } from "./views/docs.js";
+import { bindDocCounter, viewDoc, viewDocEdit, viewDocs, viewEpisode, viewTopic } from "./views/docs.js";
 import { viewAddEvent, viewEdit } from "./views/edit.js";
 import { viewHome } from "./views/home.js";
 import { viewLogins } from "./views/logins.js";
@@ -57,7 +57,7 @@ export async function render() {
     else if (name === "new") html = viewEdit(null);
     else if (name === "add") html = viewAddEvent(arg, query.get("c"));
     else if (name === "logins") html = viewLogins();
-    else if (name === "docs") html = arg ? viewTopic(arg) : viewDocs();
+    else if (name === "docs") html = !arg ? viewDocs() : /^E\d+$/.test(arg) ? viewEpisode(arg) : viewTopic(arg, query);
     else if (name === "search") html = viewSearch();
     else if (name === "settings") html = viewSettings();
     else if (name === "doc") {
@@ -75,12 +75,16 @@ export async function render() {
       : `<p class="error">${esc(state.error)}</p>`) + html;
   }
   view.innerHTML = html;
-  afterRender(name, sub);
+  afterRender(name, sub, arg);
 }
 
-function afterRender(name, sub) {
+function afterRender(name, sub, arg) {
   // 素材の一覧は全部の素材の中身から作るので、まだ読んでいないものを読んでから描き直す
   if (name === "docs") document.querySelector(".topic-tabs [aria-current]")?.scrollIntoView({ block: "nearest", inline: "center" });
+  // 企業ページのESの一覧はノートの中身から作る
+  if (name === "c" && sub !== "edit" && hasNote(arg) && !state.docCache.has(`notes/${arg}.md`)) {
+    getDoc(`notes/${arg}.md`).then(() => route().parts[1] === arg && render()).catch(() => {});
+  }
   if (name === "docs") loadAllDocs().then((loaded) => loaded && route().parts[0] === "docs" && render());
   if (name === "doc" && sub === "edit") bindDocCounter();
   if (name === "search") {
