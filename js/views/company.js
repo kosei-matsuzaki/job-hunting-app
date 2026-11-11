@@ -120,7 +120,7 @@ function esList(c) {
   if (!list) return `<p class="hint">読み込み中…</p>`;
   if (!list.length) return `<p class="hint">ESの設問はまだ書かれていません。</p>`;
   const routes = [...new Set(list.map((x) => x.route))];
-  const mark = { sent: '<span class="sent">提出</span>', old: '<span class="tag">以前の版</span>', draft: '<span class="tag draft">下書き</span>' };
+  const mark = { sent: '<span class="sent">提出</span>', final: '<span class="sent">確定</span>', old: '<span class="tag">以前の版</span>', draft: '<span class="tag draft">下書き</span>' };
   return routes
     .map((r) => `${r ? `<h3 class="sub">${esc(r)}</h3>` : ""}<ul class="es-list">${list
       .filter((x) => x.route === r)

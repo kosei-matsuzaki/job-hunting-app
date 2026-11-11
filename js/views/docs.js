@@ -28,8 +28,8 @@ const MIN_CHARS = 60;
 const VERSION = /版$|^\d+(秒|分)$/;
 const parsed = new WeakMap();
 
-const pieceState = (s = "") => (s.startsWith("提出") ? "sent" : s.includes("以前") ? "old" : "draft");
-const STATE_MARK = { sent: '<span class="sent">提出</span>', old: '<span class="tag">以前の版</span>', draft: '<span class="tag draft">下書き</span>', base: "" };
+const pieceState = (s = "") => (s.startsWith("提出") ? "sent" : s.startsWith("確定") ? "final" : s.includes("以前") ? "old" : "draft");
+const STATE_MARK = { sent: '<span class="sent">提出</span>', final: '<span class="sent">確定</span>', old: '<span class="tag">以前の版</span>', draft: '<span class="tag draft">下書き</span>', base: "" };
 
 function pieces(path, doc) {
   if (parsed.has(doc)) return parsed.get(doc);
@@ -221,7 +221,7 @@ function pieceItem(x) {
 }
 
 // 並び: 本人が書いたもの → 提出したもの → 土台 → 下書き → 以前の版。同じなら選考が進んでいる企業から
-const ORDER = { sent: 0, base: 1, draft: 2, old: 3 };
+const ORDER = { sent: 0, final: 0, base: 1, draft: 2, old: 3 };
 const byUse = (a, b) => b.mine - a.mine || ORDER[a.state] - ORDER[b.state] || coRank(a.path) - coRank(b.path);
 
 const LENGTHS = [100, 200, 300, 400, 500];
