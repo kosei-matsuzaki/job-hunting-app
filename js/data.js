@@ -1,6 +1,6 @@
 // 企業データと素材の読み込み・保存
 
-import { DATA_PATH, DOC_GROUPS, STATES } from "./config.js";
+import { DATA_PATH, DOC_GROUPS, EXTRA_DOCS, STATES } from "./config.js";
 import { explain, listDocs, readFile, writeFile } from "./github.js";
 import { render, renderChrome } from "./render.js";
 import { cfg, state, store } from "./store.js";
@@ -133,6 +133,22 @@ export async function getDoc(path, fresh = false) {
     state.docCache.set(path, doc);
     return doc;
   }
+}
+
+// 素材をすべて読み込む（素材の一覧と検索で使う）。新しく読んだものがあれば true
+let loadingAll = null;
+export function loadAllDocs() {
+  if (!state.docs) return Promise.resolve(false);
+  if (loadingAll) return loadingAll;
+  const paths = [...state.docs.flatMap((g) => g.paths), ...EXTRA_DOCS.map((d) => d.path)].filter((p) => !state.docCache.has(p));
+  if (!paths.length) return Promise.resolve(false);
+  state.docsLoading = true;
+  loadingAll = Promise.all(paths.map((p) => getDoc(p).catch(() => null))).then(() => {
+    state.docsLoading = false;
+    loadingAll = null;
+    return true;
+  });
+  return loadingAll;
 }
 
 export const hasNote = (slug) => state.docs?.find((g) => g.dir === "notes")?.paths.includes(`notes/${slug}.md`);

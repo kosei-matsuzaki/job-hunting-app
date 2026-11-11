@@ -1,4 +1,129 @@
-/* 素材: 一覧と本文（Markdown）、ESの文字数とコピー、編集欄 */
+/* 素材: 設問ごとの索引・企業ごとのノート・土台、本文（Markdown）、ESの文字数とコピー、編集欄 */
+
+/* 設問の索引: 手帳の見出し札。下に土台の版の字数を目盛りのように並べる */
+.topics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0 0; padding: 0; list-style: none; }
+.topic {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 10px 12px 9px;
+  border: 1px solid var(--rule);
+  border-top: 4px solid var(--ink);
+  border-radius: 2px 2px 8px 8px;
+  background: var(--sheet);
+  color: var(--ink);
+  text-decoration: none;
+}
+.topic:hover { border-color: var(--ink); }
+.topic-name { font-size: 1.0625rem; font-weight: 900; letter-spacing: 0.02em; }
+.topic-ask { flex: 1; margin: 2px 0 10px; color: var(--muted); font-size: 0.75rem; line-height: 1.5; }
+.topic-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; padding-top: 6px; border-top: 1px dashed var(--rule); }
+.topic-n { color: var(--muted); font-size: 0.75rem; white-space: nowrap; }
+.topic-n > span { margin-left: 8px; }
+.topic-n b, .note-meta b { color: var(--ink); font-family: var(--num); font-size: 1rem; font-weight: 600; }
+.ruler { display: inline-flex; }
+.ruler b { padding: 0 5px; border-left: 1px solid var(--faint); font-family: var(--num); font-size: 0.875rem; font-weight: 500; line-height: 1.1; color: var(--muted); }
+.ruler b:first-child { border-left: 0; padding-left: 0; }
+
+/* 企業ごとのノート */
+.notes { margin: 0; padding: 0; list-style: none; }
+.note-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink);
+  text-decoration: none;
+}
+.note-row:hover .note-name { text-decoration: underline; text-underline-offset: 3px; }
+.note-main { display: flex; flex: 1; flex-direction: column; gap: 3px; min-width: 0; }
+.note-name { font-weight: 700; }
+.note-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--muted); font-size: 0.75rem; }
+.note-next { display: flex; flex-direction: column; align-items: flex-end; max-width: 42%; color: var(--muted); font-size: 0.75rem; text-align: right; }
+.note-next b { color: var(--ink); font-family: var(--num); font-size: 1rem; font-weight: 600; }
+.note-next span { overflow: hidden; max-width: 100%; text-overflow: ellipsis; white-space: nowrap; }
+/* 提出済み: 墨の角印 */
+.sent {
+  display: inline-block;
+  padding: 0 5px;
+  border: 1.5px double var(--ink);
+  border-radius: 2px;
+  color: var(--ink);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.note-missing { margin: 10px 0 0; color: var(--muted); font-size: 0.875rem; }
+.note-missing summary { cursor: pointer; padding: 6px 0; }
+.note-missing ul { margin: 0; padding: 0; list-style: none; }
+.note-missing li { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--rule); color: var(--ink); }
+.note-missing li > span:nth-child(2) { flex: 1; }
+
+/* ひとつの設問のページ */
+.topic-tabs {
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  margin: 0 calc(var(--gutter) * -1) 4px;
+  padding: 0 var(--gutter);
+  border-bottom: 2px solid var(--ink);
+  scrollbar-width: none;
+}
+.topic-tabs::-webkit-scrollbar { display: none; }
+.topic-tabs a {
+  flex: none;
+  margin-right: 4px;
+  padding: 6px 12px 5px;
+  border: 1px solid var(--rule);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: var(--sheet-2);
+  color: var(--muted);
+  font-size: 0.8125rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.topic-tabs a[aria-current] { border-color: var(--ink); background: var(--ink); color: var(--paper); font-weight: 700; }
+.pieces { margin: 0; padding: 0; list-style: none; }
+.piece { padding: 10px 0 8px; border-bottom: 1px solid var(--rule); }
+.piece.old { opacity: 0.72; }
+.piece-top { display: flex; align-items: center; gap: 10px; }
+.piece-src { display: flex; flex: 1; align-items: center; gap: 8px; min-width: 0; font-size: 0.8125rem; }
+.piece-src a { color: var(--muted); }
+.piece-src .avatar.sm { width: 24px; height: 24px; border-width: 1.5px; font-size: 0.6875rem; }
+.piece details { margin-top: 4px; }
+.piece summary { display: block; cursor: pointer; list-style: none; }
+.piece summary::-webkit-details-marker { display: none; }
+.piece-title { display: block; font-size: 0.9375rem; }
+.piece-pre { display: -webkit-box; overflow: hidden; color: var(--muted); font-size: 0.8125rem; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.piece details[open] .piece-pre { display: none; }
+.piece summary:hover .piece-title { text-decoration: underline; text-underline-offset: 3px; }
+.piece .md { margin-top: 8px; padding: 10px 12px 2px; border-left: 2px solid var(--ink); background: var(--sheet); font-size: 0.9375rem; }
+
+/* 企業ノートの上に出す企業 */
+.doc-co {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--sheet);
+  color: var(--ink);
+  text-decoration: none;
+}
+.doc-co-name { font-weight: 700; }
+.doc-co-go { margin-left: auto; color: var(--muted); font-size: 0.8125rem; }
+.doc-co-go::after { content: " ›"; }
+.doc-co:hover { border-color: var(--ink); }
+
+.doc-list { display: grid; margin: 0; padding: 0; list-style: none; }
+.doc-name { flex: 1; }
+.blank-n { color: var(--muted); font-size: 0.75rem; white-space: nowrap; }
+.blank-n b { color: var(--ink); font-family: var(--num); font-size: 1rem; font-weight: 600; }
 
 .doc-list a {
   display: flex;
@@ -9,7 +134,7 @@
   color: var(--ink);
   text-decoration: none;
 }
-.doc-list a:hover span:last-child { text-decoration: underline; text-underline-offset: 3px; }
+.doc-list a:hover .doc-name { text-decoration: underline; text-underline-offset: 3px; }
 /* 罫線の入った紙 */
 .doc-icon {
   display: inline-block;
@@ -93,12 +218,16 @@
 .toc button.sub { margin: 0; color: var(--muted); font-weight: 400; }
 
 @media (min-width: 760px) {
-  .doc-list { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+  .doc-list { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); column-gap: 24px; }
+  .topics { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .topic-tabs { margin: 0 0 4px; padding: 0; }
 
   .toc { flex-wrap: wrap; overflow: visible; margin: 6px 0 4px; padding: 4px 0 8px; }
 }
 
 @media (min-width: 1024px) {
+  .notes { display: grid; grid-template-columns: 1fr 1fr; column-gap: 28px; }
+  .topic-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 36px; align-items: start; }
   /* 素材: 目次を左に固定 */
   .doc-layout.has-toc { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 36px; align-items: start; }
   .doc-layout .toc {

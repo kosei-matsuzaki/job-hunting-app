@@ -1,7 +1,7 @@
 // 画面: 検索
 
-import { EXTRA_DOCS, STATES } from "../config.js";
-import { getDoc } from "../data.js";
+import { STATES } from "../config.js";
+import { loadAllDocs } from "../data.js";
 import { fmtDate } from "../dates.js";
 import { esc } from "../md.js";
 import { allEvents, byWhen } from "../model.js";
@@ -71,13 +71,8 @@ export function viewSearch() {
     <div id="results">${searchResults(ui.q)}</div>`;
 }
 
-export async function loadAllDocs() {
-  if (state.docsLoading || !state.docs) return;
-  const paths = [...state.docs.flatMap((g) => g.paths), ...EXTRA_DOCS.map((d) => d.path)].filter((p) => !state.docCache.has(p));
-  if (!paths.length) return;
-  state.docsLoading = true;
-  await Promise.all(paths.map((p) => getDoc(p).catch(() => null)));
-  state.docsLoading = false;
+export async function loadSearchDocs() {
+  if (!(await loadAllDocs())) return;
   const box = document.getElementById("results");
   if (box) box.innerHTML = searchResults(ui.q);
 }

@@ -1,7 +1,7 @@
 // 描画とルーティング
 
 import { COMPANY_TABS } from "./config.js";
-import { getDoc } from "./data.js";
+import { getDoc, loadAllDocs } from "./data.js";
 import { explain } from "./github.js";
 import { esc } from "./md.js";
 import { companyState } from "./model.js";
@@ -9,11 +9,11 @@ import { cfg, state, store, ui } from "./store.js";
 import { viewCalendar } from "./views/calendar.js";
 import { companyPool, companyRows, viewCompanies } from "./views/companies.js";
 import { viewCompany } from "./views/company.js";
-import { bindDocCounter, viewDoc, viewDocEdit, viewDocs } from "./views/docs.js";
+import { bindDocCounter, viewDoc, viewDocEdit, viewDocs, viewTopic } from "./views/docs.js";
 import { viewAddEvent, viewEdit } from "./views/edit.js";
 import { viewHome } from "./views/home.js";
 import { viewLogins } from "./views/logins.js";
-import { loadAllDocs, searchResults, viewSearch } from "./views/search.js";
+import { loadSearchDocs, searchResults, viewSearch } from "./views/search.js";
 import { viewLogin, viewSettings } from "./views/settings.js";
 
 export const $view = () => document.getElementById("view");
@@ -57,7 +57,7 @@ export async function render() {
     else if (name === "new") html = viewEdit(null);
     else if (name === "add") html = viewAddEvent(arg, query.get("c"));
     else if (name === "logins") html = viewLogins();
-    else if (name === "docs") html = viewDocs();
+    else if (name === "docs") html = arg ? viewTopic(arg) : viewDocs();
     else if (name === "search") html = viewSearch();
     else if (name === "settings") html = viewSettings();
     else if (name === "doc") {
@@ -79,6 +79,9 @@ export async function render() {
 }
 
 function afterRender(name, sub) {
+  // 素材の一覧は全部の素材の中身から作るので、まだ読んでいないものを読んでから描き直す
+  if (name === "docs") document.querySelector(".topic-tabs [aria-current]")?.scrollIntoView({ block: "nearest", inline: "center" });
+  if (name === "docs") loadAllDocs().then((loaded) => loaded && route().parts[0] === "docs" && render());
   if (name === "doc" && sub === "edit") bindDocCounter();
   if (name === "search") {
     const box = document.getElementById("q");
@@ -87,7 +90,7 @@ function afterRender(name, sub) {
       document.getElementById("results").innerHTML = searchResults(ui.q);
     });
     if (!ui.q) box.focus();
-    loadAllDocs();
+    loadSearchDocs();
   }
   if (name === "logins") {
     const box = document.getElementById("lq");
