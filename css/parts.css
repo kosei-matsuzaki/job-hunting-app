@@ -1,0 +1,159 @@
+/* 画面をまたいで使う部品: 企業の印・選考の種類・状況・予定の行・一覧の行 */
+
+/* 企業の印（業界ごとの色の丸印） */
+.avatar {
+  --c: var(--other);
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border: 1.5px solid var(--c);
+  border-radius: 50%;
+  background: var(--sheet);
+  color: var(--c);
+  font-weight: 700;
+  font-size: 1rem;
+}
+.avatar.sm { width: 32px; height: 32px; font-size: 0.8125rem; }
+.avatar.lg { width: 60px; height: 60px; border-width: 2.5px; font-size: 1.5rem; }
+.avatar.game, .ind-dot.game { --c: var(--game); }
+.avatar.web, .ind-dot.web { --c: var(--web); }
+.avatar.ai, .ind-dot.ai { --c: var(--ai-rd); }
+.avatar.consult, .ind-dot.consult { --c: var(--consult); }
+.avatar.maker, .ind-dot.maker { --c: var(--maker); }
+.avatar.sier, .ind-dot.sier { --c: var(--sier); }
+.avatar.trade, .ind-dot.trade { --c: var(--trade); }
+.avatar.finance, .ind-dot.finance { --c: var(--finance); }
+.ind-dot { --c: var(--other); display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--c); }
+
+/* 選考の種類 */
+.kind {
+  --k: var(--ai);
+  display: inline-block;
+  flex: none;
+  padding: 0 6px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--k) 12%, var(--sheet));
+  color: var(--k);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.7;
+  white-space: nowrap;
+}
+.kind.intern { --k: var(--intern); }
+.kind.early { --k: var(--early); }
+.kind.info { --k: var(--muted); }
+
+/* 状況: 印のように枠で見分ける */
+.pill {
+  display: inline-block;
+  padding: 0 7px;
+  border: 1.5px solid var(--ink);
+  border-radius: 4px;
+  color: var(--ink);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.55;
+  white-space: nowrap;
+}
+.pill.todo { background: var(--ink); color: var(--paper); }
+.pill.waiting { background: transparent; }
+.pill.plan { border-style: dashed; color: var(--muted); border-color: var(--muted); }
+.pill.watch { border: 1px dotted var(--faint); color: var(--muted); font-weight: 500; }
+.pill.offer { border: 3px double var(--shu); color: var(--shu); transform: rotate(-3deg); }
+.pill.declined, .pill.rejected, .pill.skip { border-color: transparent; color: var(--faint); text-decoration: line-through; font-weight: 500; }
+
+.tag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 5px;
+  border-radius: 3px;
+  background: var(--sheet-2);
+  color: var(--muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  vertical-align: 1px;
+}
+.tag.event { background: var(--ai-soft); color: var(--ai); }
+.tag.tentative { margin: 0 0 0 6px; border: 1px dashed var(--faint); background: none; }
+.tag.prog { border: 1px solid currentColor; background: none; }
+
+.stars-mini { margin-left: 6px; color: var(--shu); font-size: 0.6875rem; letter-spacing: -0.05em; }
+
+.day-head { margin: 16px 0 0; color: var(--muted); font-size: 0.8125rem; font-weight: 700; }
+.day-head.urgent { color: var(--shu); }
+
+.ev-list { margin: 0; padding: 0; list-style: none; }
+.ev-row {
+  display: grid;
+  grid-template-columns: 3.2em 1fr auto 34px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.ev-list li:last-child { border-bottom: 0; }
+.ev-list.plain .ev-row { grid-template-columns: 4.4em 1fr auto 34px; }
+.ev-list.plain li:last-child { border-bottom: 1px solid var(--rule); }
+.ev-when { display: flex; flex-direction: column; line-height: 1.25; font-family: var(--num); font-variant-numeric: tabular-nums; }
+.ev-date { font-size: 1rem; font-weight: 600; }
+.ev-time { color: var(--muted); font-size: 0.9375rem; font-weight: 500; }
+.ev-row.is-deadline .ev-time { color: var(--shu); }
+.ev-main { display: flex; flex-direction: column; min-width: 0; line-height: 1.45; }
+.ev-co { color: var(--ink); font-weight: 700; text-decoration: none; }
+.ev-co:hover { text-decoration: underline; }
+.ev-title { font-size: 0.9375rem; }
+.ev-sub { color: var(--muted); font-size: 0.75rem; }
+.ev-left { color: var(--muted); font-size: 0.75rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ev-row.urgent, .ev-row.soon { color: inherit; }
+.ev-row.urgent .ev-left { color: var(--shu); font-weight: 700; }
+.ev-row.soon .ev-left { color: var(--early); font-weight: 700; }
+.ev-row.done { opacity: 0.55; }
+.ev-row.done .ev-title { text-decoration: line-through; }
+
+/* 手帳のチェック欄 */
+.tick {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1.5px solid var(--faint);
+  border-radius: 6px;
+  background: var(--sheet);
+  color: transparent;
+  cursor: pointer;
+}
+.tick svg { width: 18px; height: 18px; stroke-width: 2.4; }
+.tick:hover { border-color: var(--ink); color: var(--ink); }
+
+.active-list, .co-list, .login-list, .doc-list, .results { margin: 0; padding: 0; list-style: none; }
+.active-row, .co-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink);
+  text-decoration: none;
+}
+.active-list li:last-child .active-row { border-bottom: 0; }
+.active-row:hover .ar-name, .co-row:hover .co-name { text-decoration: underline; text-underline-offset: 3px; }
+.ar-body, .co-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ar-name, .co-name { font-weight: 700; }
+.ar-prog { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 0.875rem; }
+.ar-next, .co-next { color: var(--muted); font-size: 0.8125rem; }
+.ar-next.urgent, .co-next.urgent { color: var(--shu); }
+.ar-next.soon, .co-next.soon { color: var(--early); }
+
+/* 押印欄（小）: 通った段階は墨、いまの段階は朱 */
+.route-mini { display: inline-flex; gap: 2px; }
+.route-mini .st { width: 9px; height: 9px; border: 1.5px solid var(--faint); border-radius: 2px; }
+.route-mini .st.past { border-color: var(--ink); background: var(--ink); }
+.route-mini .st.now { border-color: var(--shu); background: var(--shu); }
+
+@media (min-width: 760px) {
+  .co-list, .login-list, .doc-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 0 32px; }
+}

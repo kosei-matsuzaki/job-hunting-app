@@ -1,0 +1,87 @@
+/* カレンダー: 手帳の月間ページ */
+
+.cal-head { display: flex; align-items: center; gap: 4px; margin: 6px 0 10px; }
+.cal-head .page-title { flex: 1; font-size: 1.375rem; text-align: center; }
+.cal {
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--sheet);
+}
+.cal-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.cal-row:not(.cal-wd) { border-top: 1px solid var(--rule); }
+.cal-wd span { padding: 6px 0 4px; color: var(--muted); font-size: 0.75rem; font-weight: 700; text-align: center; }
+.cal-wd .sun, .cal-cell.sun .cal-d { color: var(--shu); }
+.cal-wd .sat, .cal-cell.sat .cal-d { color: var(--ai); }
+.cal-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 56px;
+  padding: 4px 0;
+  color: var(--ink);
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+}
+.cal-cell + .cal-cell { border-left: 1px solid var(--rule); }
+.cal-cell:hover { background: var(--sheet-2); }
+.cal-d { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 6px; font-family: var(--num); font-size: 1.125rem; font-weight: 500; }
+.cal-cell.out { opacity: 0.35; }
+.cal-cell.today .cal-d { box-shadow: inset 0 0 0 1.5px var(--ink); font-weight: 700; }
+.cal-cell.selected { background: var(--sheet-2); }
+.cal-cell.selected .cal-d { background: var(--ink); color: var(--paper) !important; font-weight: 700; }
+.cal-dots { display: flex; align-items: center; gap: 3px; height: 8px; }
+.cal-dots i { width: 6px; height: 6px; }
+.cal-dots b { color: var(--muted); font-size: 0.625rem; }
+.cal-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 8px 2px 0; color: var(--muted); font-size: 0.75rem; }
+.cal-legend i { margin-right: 4px; }
+.cal-scope { margin: 0 0 10px; }
+.day-sheet { margin-top: 16px; }
+.day-sheet .day-head { margin-top: 10px; color: var(--ink); font-size: 1rem; }
+
+.fab {
+  position: fixed;
+  right: max(var(--gutter), calc((100vw - 680px) / 2 + var(--gutter)));
+  bottom: calc(var(--tabs-h) + env(safe-area-inset-bottom) + 16px);
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: var(--ink);
+  color: var(--paper);
+  box-shadow: 0 8px 20px -6px rgb(20 22 26 / 0.45);
+}
+.fab svg { width: 26px; height: 26px; stroke-width: 2.4; }
+.fab-space { height: 72px; }
+
+.cal-evs { display: none; }
+
+@media (min-width: 1024px) {
+  .fab, .fab-space { display: none; }
+
+  /* カレンダー: 月を大きく、選んだ日を右 */
+  .cal-layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 0 32px; align-items: start; }
+  .cal-aside .day-sheet { margin-top: 0; }
+  .cal-head .page-title { order: -1; text-align: left; }
+  .cal-cell { align-items: stretch; min-width: 0; min-height: 108px; padding: 4px 5px; }
+  .cal-d { width: 30px; height: 28px; font-size: 1.125rem; }
+  .cal-dots { display: none; }
+  .cal-evs { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .cal-ev {
+    overflow: hidden;
+    padding: 0 5px;
+    border-left: 3px solid var(--shu);
+    background: var(--shu-soft);
+    color: var(--ink);
+    font-size: 0.6875rem;
+    line-height: 1.6;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cal-ev.event { border-left-color: var(--ai); background: var(--ai-soft); }
+  .cal-ev.done { border-left-color: var(--faint); background: var(--sheet-2); color: var(--faint); text-decoration: line-through; }
+  .cal-evs b { padding-left: 6px; color: var(--muted); font-size: 0.625rem; }
+}

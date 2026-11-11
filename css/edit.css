@@ -1,0 +1,20 @@
+/* 企業の編集・予定の追加 */
+
+.pf-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+
+fieldset.pf, fieldset.ev {
+  margin: 0 0 12px;
+  padding: 6px 14px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--sheet);
+}
+fieldset.pf { border-top: 3px solid var(--ink); }
+fieldset.ev { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; border-left: 3px solid var(--shu); }
+fieldset.ev label { margin: 6px 0; }
+fieldset.ev .ev-title-in, fieldset.ev label:nth-of-type(1), fieldset.ev label:nth-of-type(2) { grid-column: 1 / -1; }
+fieldset.ev .ev-title-in { margin-top: 8px; font-weight: 700; }
+fieldset label.check { flex-direction: row; align-items: center; gap: 8px; color: var(--ink); }
+fieldset label.check input { width: 20px; height: 20px; min-height: 0; accent-color: var(--ink); }
+fieldset [data-remove-fs] { grid-column: 1 / -1; justify-self: end; margin-top: 6px; }
+.form-actions { margin-top: 24px; }

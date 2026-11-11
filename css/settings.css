@@ -1,0 +1,13 @@
+/* 接続画面（トークンの入力） */
+
+.login { max-width: 560px; margin: 0 auto; padding-top: 24px; }
+.login-title {
+  margin: 0 0 16px;
+  padding-bottom: 10px;
+  border-bottom: 3px solid var(--ink);
+  font-size: 2.25rem;
+  letter-spacing: 0.06em;
+}
+.steps { padding-left: 1.3em; }
+.steps li { margin: 6px 0; }
+.login details { margin: 8px 0; color: var(--muted); font-size: 0.875rem; }

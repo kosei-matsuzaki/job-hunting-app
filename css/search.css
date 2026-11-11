@@ -1,0 +1,8 @@
+/* 検索 */
+
+.results li { padding: 10px 0; border-bottom: 1px solid var(--rule); }
+.results li > a { color: var(--ink); font-weight: 700; text-decoration: none; }
+.results li > a:hover { text-decoration: underline; }
+.results .co-ind { margin-left: 8px; color: var(--muted); font-size: 0.75rem; }
+.results p { margin: 2px 0 0; color: var(--muted); font-size: 0.875rem; line-height: 1.55; }
+mark { padding: 0 1px; background: linear-gradient(transparent 55%, color-mix(in srgb, var(--shu) 30%, transparent) 55%); color: inherit; }
