@@ -56,8 +56,8 @@ function splitRow(line) {
     .map((c) => c.trim().replace(/\\\|/g, "|"));
 }
 
-// ESの文章の情報の行: 「> 種類: ガクチカ｜字数: 200字以内｜状態: 提出 2026-10-30｜ルート: 早期選考｜話: E1」
-const META_KEYS = ["種類", "字数", "状態", "ルート", "話"];
+// ESの文章の情報の行: 「> 種類: ガクチカ｜字数: 200字以内｜状態: 提出 2026-10-30｜ルート: 早期選考｜話: E1｜書いた人: 本人」
+const META_KEYS = ["種類", "字数", "状態", "ルート", "話", "書いた人"];
 export function parseMeta(line) {
   const pairs = line.split("｜").map((x) => x.match(/^\s*([^:：]+)[:：]\s*(.*?)\s*$/));
   if (!pairs.every((m) => m && META_KEYS.includes(m[1]))) return null;

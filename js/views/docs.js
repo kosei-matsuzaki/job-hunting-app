@@ -73,6 +73,8 @@ function pieces(path, doc) {
         date: (meta.状態 || "").match(/\d{4}-\d{2}-\d{2}/)?.[0] || "",
         state: isNote ? pieceState(meta.状態) : "base",
         eps: (meta.話 || "").split(/[・、,\s]+/).filter(Boolean),
+        // 本人が書いた文章が正典（2026/11/12 から）
+        mine: meta.書いた人 === "本人",
         html: x.blocks.map((b) => b.html).join(""),
       };
     })
@@ -210,17 +212,17 @@ function pieceItem(x) {
   const src = c ? `${avatar(c, "sm")}<a href="${docLink(x.path)}">${esc(c.name)}</a>` : `<a class="base-src" href="${docLink(x.path)}">土台・${esc(docName(x.path))}</a>`;
   const preview = x.text.replace(/\s+/g, " ").slice(0, 80);
   const sub = [x.route && esc(x.route), x.date && esc(fmtDate(x.date))].filter(Boolean).join(" ");
-  return `<li class="piece is-${x.state}">
-    <div class="piece-top"><span class="piece-src">${src}${STATE_MARK[x.state]}${sub ? `<small>${sub}</small>` : ""}</span>
+  return `<li class="piece is-${x.state}${x.mine ? " is-mine" : ""}">
+    <div class="piece-top"><span class="piece-src">${src}${x.mine ? '<span class="mine">本人</span>' : ""}${STATE_MARK[x.state]}${sub ? `<small>${sub}</small>` : ""}</span>
       <span class="chars">${x.chars}字${x.limit ? `<small>／${esc(x.limit)}</small>` : ""}</span><button class="mini" data-copy="${esc(x.text)}">コピー</button></div>
     <details><summary><b class="piece-title">${esc(x.title)}</b><span class="piece-pre">${esc(preview)}</span></summary><div class="md">${x.html}</div></details>
     ${x.eps.length ? `<p class="piece-eps">${x.eps.map((e) => `<a href="#/docs/${esc(e)}">${esc(e)}</a>`).join("")}</p>` : ""}
   </li>`;
 }
 
-// 並び: 提出したもの → 土台 → 下書き → 以前の版。同じなら選考が進んでいる企業から
+// 並び: 本人が書いたもの → 提出したもの → 土台 → 下書き → 以前の版。同じなら選考が進んでいる企業から
 const ORDER = { sent: 0, base: 1, draft: 2, old: 3 };
-const byUse = (a, b) => ORDER[a.state] - ORDER[b.state] || coRank(a.path) - coRank(b.path);
+const byUse = (a, b) => b.mine - a.mine || ORDER[a.state] - ORDER[b.state] || coRank(a.path) - coRank(b.path);
 
 const LENGTHS = [100, 200, 300, 400, 500];
 
@@ -229,15 +231,17 @@ export function viewTopic(key, query) {
   if (!t) return `<a class="back" href="#/docs">素材</a><p class="error">見つかりません。</p>`;
   const len = Number(query.get("len")) || 0;
   const ep = query.get("ep") || "";
+  const mine = query.get("by") === "me";
   const pool = allPieces().filter((x) => x.topic === key);
   const eps = [...new Set(pool.flatMap((x) => x.eps))].sort((a, b) => a.slice(1) - b.slice(1));
-  let list = pool.filter((x) => !ep || x.eps.includes(ep));
+  let list = pool.filter((x) => (!ep || x.eps.includes(ep)) && (!mine || x.mine));
   // 字数を選ぶと、近い順に1列で並べる（多少長さが違っても、近いものから直して使う）
   list = len ? list.sort((a, b) => Math.abs(a.chars - len) - Math.abs(b.chars - len)) : list.sort(byUse);
-  const link = (l, e) => {
+  const link = (l, e, m = mine) => {
     const q = new URLSearchParams();
     if (l) q.set("len", l);
     if (e) q.set("ep", e);
+    if (m) q.set("by", "me");
     return `#/docs/${key}${q.toString() ? `?${q}` : ""}`;
   };
   const eplist = episodes();
@@ -247,9 +251,10 @@ export function viewTopic(key, query) {
     <nav class="topic-tabs" aria-label="設問の種類">${TOPICS.map((x) => `<a href="#/docs/${x.key}"${x.key === key ? ' aria-current="page"' : ""}>${esc(x.name)}</a>`).join("")}</nav>
     <div class="filters">
       <div class="chips" aria-label="字数"><span class="chips-label">字数</span>${chip(link(0, ep), !len, "すべて")}${LENGTHS.map((n) => chip(link(n, ep), len === n, `${n}字`)).join("")}</div>
+      <div class="chips" aria-label="書いた人"><span class="chips-label">書き手</span>${chip(link(len, ep, false), !mine, "すべて")}${chip(link(len, ep, true), mine, "本人の文章（正典）")}</div>
       ${eps.length ? `<div class="chips" aria-label="話"><span class="chips-label">話</span>${chip(link(len, ""), !ep, "すべて")}${eps.map((e) => chip(link(len, e), ep === e, e, eplist.find((x) => x.id === e)?.title)).join("")}</div>` : ""}
     </div>
-    ${len ? `<p class="sec-hint hint">${len}字に近い順。長いものは削り、短いものは足して使う。</p>` : `<p class="sec-hint hint">提出したもの → 土台 → 下書きの順。${t.files.map((p) => `<a href="${docLink(p)}">${esc(docName(p))}</a>`).join("・")}</p>`}
+    ${len ? `<p class="sec-hint hint">${len}字に近い順。長いものは削り、短いものは足して使う。</p>` : `<p class="sec-hint hint">本人の文章 → 提出したもの → 土台 → 下書きの順。${t.files.map((p) => `<a href="${docLink(p)}">${esc(docName(p))}</a>`).join("・")}</p>`}
     <ul class="pieces">${list.map(pieceItem).join("") || `<li class="hint">${loadingNote() || "まだありません。"}</li>`}</ul>`;
 }
 

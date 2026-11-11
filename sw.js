@@ -1,6 +1,6 @@
 // アプリの画面だけを端末に残し、電波がなくても開けるようにする。
 // GitHub API（データ）は扱わない。データの控えは js/data.js が端末内に持つ。
-const CACHE = "shukatsu-board-v9";
+const CACHE = "shukatsu-board-v10";
 const SHELL = [
   "./", "index.html", "icon.svg", "manifest.webmanifest",
   ...["base", "parts", "home", "calendar", "companies", "company", "edit", "logins", "docs", "search", "settings"].map((n) => `css/${n}.css`),

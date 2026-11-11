@@ -110,7 +110,9 @@
 .chars small { margin-left: 1px; color: var(--faint); font-family: var(--font); font-size: 0.6875rem; }
 .piece-src small { color: var(--muted); font-size: 0.75rem; }
 .piece-src .base-src { color: var(--ink); font-weight: 700; }
-.piece.is-base { border-left: 3px solid var(--ink); padding-left: 10px; }
+.piece.is-base { border-left: 3px solid var(--rule); padding-left: 10px; }
+/* 本人が書いた文章（正典）は墨の線で目立たせる */
+.piece.is-mine { border-left: 3px solid var(--ink); padding-left: 10px; }
 .piece-eps { display: flex; gap: 4px; margin: 6px 0 0; }
 .piece-eps a, .ep-id {
   padding: 0 6px;
@@ -127,7 +129,7 @@
 .filters { display: flex; flex-direction: column; gap: 6px; margin: 12px 0 4px; }
 .chips { display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none; }
 .chips::-webkit-scrollbar { display: none; }
-.chips-label { flex: none; width: 2.5em; color: var(--muted); font-size: 0.75rem; }
+.chips-label { flex: none; min-width: 3.2em; color: var(--muted); font-size: 0.75rem; white-space: nowrap; }
 .chip {
   flex: none;
   padding: 3px 11px;

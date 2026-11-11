@@ -124,7 +124,7 @@ function esList(c) {
   return routes
     .map((r) => `${r ? `<h3 class="sub">${esc(r)}</h3>` : ""}<ul class="es-list">${list
       .filter((x) => x.route === r)
-      .map((x) => `<li><span class="es-q">${esc(x.title)}</span><span class="es-meta">${mark[x.state]}<span class="chars">${x.chars}字${x.limit ? `<small>／${esc(x.limit)}</small>` : ""}</span><button class="mini" data-copy="${esc(x.text)}">コピー</button></span></li>`)
+      .map((x) => `<li><span class="es-q">${esc(x.title)}</span><span class="es-meta">${x.mine ? '<span class="mine">本人</span>' : ""}${mark[x.state]}<span class="chars">${x.chars}字${x.limit ? `<small>／${esc(x.limit)}</small>` : ""}</span><button class="mini" data-copy="${esc(x.text)}">コピー</button></span></li>`)
       .join("")}</ul>`)
     .join("");
 }
