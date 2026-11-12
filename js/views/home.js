@@ -1,25 +1,22 @@
 // 画面: ホーム
 
-import { COMPANY_TABS, IN_SELECTION, PAST_DAYS, STATE_RANK, WD } from "../config.js";
+import { COMPANY_TABS, PAST_DAYS, WD } from "../config.js";
 import { addDays, dayLabel, daysUntil, fmtDate, isoOf, today, urgency, whenText } from "../dates.js";
 import { esc } from "../md.js";
-import { byWhen, companyState, isTracked, liveEvents, nextEvent } from "../model.js";
-import { avatar, eventRow, groupByDay, kindBadge, routeMini, statePill } from "../parts.js";
+import { byWhen, companyState, isEnded, isWaiting, liveEvents, nextEvent } from "../model.js";
+import { avatar, eventRow, groupByDay, kindBadge, routeMini } from "../parts.js";
 import { state } from "../store.js";
 
 export function viewHome() {
   const t = today();
-  // ホームには「応募予定・選考中・内定」の企業だけを出す。気になる企業は件数だけ
-  const all = liveEvents();
-  const live = all.filter((e) => isTracked(e.c));
+  // 終了した企業（見送り・辞退・不合格）の予定は出さない
+  const live = liveEvents();
   const upcoming = live.filter((e) => daysUntil(e.date) >= 0).sort(byWhen);
   const week = upcoming.filter((e) => daysUntil(e.date) <= 6);
   const overdue = live.filter((e) => daysUntil(e.date) < 0 && daysUntil(e.date) >= -PAST_DAYS).sort(byWhen);
-  const watchSoon = all.filter((e) => companyState(e.c) === "watch" && daysUntil(e.date) >= 0 && daysUntil(e.date) <= 14 && e.kind !== "event");
-  const watchSoonCompanies = new Set(watchSoon.map((e) => e.c.slug)).size;
   const active = state.companies
-    .flatMap((c) => c.programs.filter((p) => IN_SELECTION.has(p.state)).map((p) => ({ c, p, nx: nextEvent(c, p.id) })))
-    .sort((a, b) => STATE_RANK[a.p.state] - STATE_RANK[b.p.state] || (a.nx && b.nx ? byWhen(a.nx, b.nx) : a.nx ? -1 : b.nx ? 1 : 0));
+    .flatMap((c) => c.programs.filter((p) => p.state === "todo").map((p) => ({ c, p, nx: nextEvent(c, p.id) })))
+    .sort((a, b) => (a.nx && b.nx ? byWhen(a.nx, b.nx) : a.nx ? -1 : b.nx ? 1 : 0));
   const count = (tab) => state.companies.filter((c) => COMPANY_TABS.find((x) => x.v === tab).test(companyState(c))).length;
 
   let html = `
@@ -27,7 +24,7 @@ export function viewHome() {
       <h1 class="page-title">${t.getMonth() + 1}月${t.getDate()}日<span class="wd">${WD[t.getDay()]}曜日</span></h1>
     </header>
     <nav class="tally" aria-label="企業の状況">
-      ${["active", "plan", "watch"].map((v) => `<a href="#/companies" data-goto-tab="${v}" class="tally-item ${v}"><b>${count(v)}</b>${COMPANY_TABS.find((x) => x.v === v).label}</a>`).join("")}
+      ${["active", "plan", "closed"].map((v) => `<a href="#/companies" data-goto-tab="${v}" class="tally-item ${v}"><b>${count(v)}</b>${COMPANY_TABS.find((x) => x.v === v).label}</a>`).join("")}
     </nav>
     <div class="dash"><div class="dash-main">`;
 
@@ -50,7 +47,7 @@ export function viewHome() {
         </div>
       </section>`;
   } else {
-    html += `<section class="empty-panel">応募予定・選考中の企業に、これからの締切はありません。<br><a href="#/companies" data-goto-tab="watch">「気になる」から応募する企業を選ぶ</a></section>`;
+    html += `<section class="empty-panel">これからの締切はありません。<br><a href="#/companies" data-goto-tab="plan">応募前の企業を見る</a></section>`;
   }
 
   // 1週間の帯
@@ -83,9 +80,6 @@ export function viewHome() {
   if (later.length) {
     html += `<section class="card"><h2 class="sec">その先の予定<a class="sec-link" href="#/calendar">カレンダー</a></h2><ul class="ev-list plain">${later.map((e) => eventRow(e, { date: true })).join("")}</ul></section>`;
   }
-  if (watchSoon.length) {
-    html += `<a class="notice-link" href="#/companies" data-goto-tab="watch">「気になる」企業に、2週間以内の締切が${watchSoon.length}件（${watchSoonCompanies}社）あります<span>見る</span></a>`;
-  }
   html += `</div><div class="dash-side">`;
 
   if (active.length) {
@@ -96,7 +90,7 @@ export function viewHome() {
           ${avatar(c)}
           <span class="ar-body">
             <span class="ar-name">${esc(c.name)}</span>
-            <span class="ar-prog">${routeMini(p)}<b>${esc(p.step || "")}</b>${statePill(p.state)}${c.programs.length > 1 ? kindBadge(p.kind) : ""}</span>
+            <span class="ar-prog">${routeMini(p)}<b>${esc(p.step || "")}</b>${isWaiting(c, p) ? '<span class="tag wait">結果待ち</span>' : ""}${c.programs.length > 1 ? kindBadge(p.kind) : ""}</span>
             ${nx ? `<span class="ar-next ${urgency(daysUntil(nx.date))}">${esc(fmtDate(nx.date))} ${esc(nx.title)}</span>` : ""}
           </span>
         </a></li>`;
@@ -110,10 +104,10 @@ export function viewHome() {
       <ul class="ev-list plain">${overdue.map((e) => eventRow(e, { date: true })).join("")}</ul></section>`;
   }
 
-  const todos = state.companies.filter((c) => c.todo.length && isTracked(c));
+  const todos = state.companies.filter((c) => c.todo.length && !isEnded(c));
   if (todos.length) {
     const total = todos.reduce((n, c) => n + c.todo.length, 0);
-    html += `<details class="todos card"><summary>調べること・転記すること<span class="count">${total}</span></summary><ul>`;
+    html += `<details class="todos card"><summary>やること<span class="count">${total}</span></summary><ul>`;
     for (const c of todos) {
       html += `<li><a href="#/c/${esc(c.slug)}">${esc(c.name)}</a><ul>${c.todo.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></li>`;
     }

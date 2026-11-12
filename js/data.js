@@ -1,6 +1,6 @@
 // 企業データと素材の読み込み・保存
 
-import { DATA_PATH, DOC_GROUPS, EXTRA_DOCS, STATES } from "./config.js";
+import { DATA_PATH, DOC_GROUPS, EXTRA_DOCS, OLD_STATES, STATES } from "./config.js";
 import { explain, listDocs, readFile, writeFile } from "./github.js";
 import { render, renderChrome } from "./render.js";
 import { cfg, state, store } from "./store.js";
@@ -8,18 +8,24 @@ import { toast } from "./toast.js";
 
 export const newId = () => "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 
-// 古い形（会社ごとに状況を1つだけ持つ）のデータも、選考ルートの形にそろえる
+// 古い形（会社ごとに状況を1つだけ持つ・以前の状況の名前・リンクの欄）のデータも、いまの形にそろえる
 export function normalize(c) {
   c.events ||= [];
-  c.links ||= [];
   c.todo ||= [];
   c.history ||= [];
+  c.memo ||= "";
   c.mypage ||= { url: "", id: "", password: "" };
+  // リンクの欄はメモの末尾に移す
+  if (c.links?.length) {
+    const list = c.links.map((l) => `- [${l.label || l.url}](${l.url})`).join("\n");
+    c.memo = `${c.memo.trim()}\n\nリンク:\n${list}`.trim();
+  }
+  delete c.links;
   if (!Array.isArray(c.programs)) {
     const kind = c.track || "本選考";
     c.programs = [{
       id: "p1", kind, title: kind, url: "", entryUrl: "", period: "",
-      flow: c.flow || [], process: "", status: "不明", state: c.state || "before", step: c.step || "",
+      flow: c.flow || [], process: "", status: "不明", state: c.state || "plan", step: c.step || "",
     }];
     delete c.track;
     delete c.state;
@@ -29,8 +35,8 @@ export function normalize(c) {
   for (const p of c.programs) {
     p.id ||= newId();
     p.flow ||= [];
-    if (p.state === "before") p.state = "watch"; // 旧「エントリー前」
-    p.state = STATES[p.state] ? p.state : "watch";
+    p.state = OLD_STATES[p.state] || p.state;
+    p.state = STATES[p.state] ? p.state : "plan";
     p.step ||= "";
   }
   return c;

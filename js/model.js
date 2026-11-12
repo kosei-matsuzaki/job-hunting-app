@@ -1,6 +1,6 @@
 // 企業・選考ルートの問い合わせ
 
-import { ENDED, STATE_RANK, TRACKED } from "./config.js";
+import { ENDED, STATE_RANK } from "./config.js";
 import { daysUntil } from "./dates.js";
 import { state } from "./store.js";
 
@@ -11,7 +11,7 @@ export const programOf = (c, pid) => c?.programs.find((p) => p.id === pid);
 export const flowIndex = (p) => p.flow.indexOf(p.step);
 
 export function companyState(c) {
-  if (!c.programs.length) return "watch";
+  if (!c.programs.length) return "plan";
   return c.programs.map((p) => p.state).sort((a, b) => STATE_RANK[a] - STATE_RANK[b])[0];
 }
 
@@ -37,4 +37,7 @@ export function defaultProgram(c) {
   return [...c.programs].sort((a, b) => STATE_RANK[a.state] - STATE_RANK[b.state])[0];
 }
 
-export const isTracked = (c) => TRACKED.has(companyState(c));
+// 選考中で、そのルートにこれからの予定がない（相手の番）
+export const isWaiting = (c, p) => p.state === "todo" && !nextEvent(c, p.id);
+
+export const hasLogin = (c) => !!(c.mypage.url || c.mypage.id || c.mypage.password);

@@ -36,7 +36,6 @@
 .cal-dots b { color: var(--muted); font-size: 0.625rem; }
 .cal-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 8px 2px 0; color: var(--muted); font-size: 0.75rem; }
 .cal-legend i { margin-right: 4px; }
-.cal-scope { margin: 0 0 10px; }
 .day-sheet { margin-top: 16px; }
 .day-sheet .day-head { margin-top: 10px; color: var(--ink); font-size: 1rem; }
 

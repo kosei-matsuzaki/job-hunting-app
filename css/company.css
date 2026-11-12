@@ -21,7 +21,20 @@
 .stars button[aria-pressed="true"] { color: var(--shu); }
 .stars-label { margin-left: 6px; color: var(--muted); font-size: 0.75rem; }
 
-.quick { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 22px; }
+/* マイページ: 開く・コピーと、登録・変更のフォーム */
+.login-card { margin-bottom: 22px; }
+.quick { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.login-card .quick + .mp-edit, .login-card .quick + .cred { margin-top: 8px; }
+.cred { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; color: var(--muted); font-size: 0.8125rem; }
+.cred code { font-family: var(--mono); color: var(--ink); }
+.mp-edit summary { cursor: pointer; }
+.cred .mp-edit { margin-left: auto; }
+.cred .mp-edit[open] { flex-basis: 100%; margin-left: 0; }
+.cred .mp-edit > summary { color: var(--ai); font-weight: 700; list-style: none; }
+.cred .mp-edit > summary::-webkit-details-marker, .mp-edit > summary.qa::-webkit-details-marker { display: none; }
+.mp-edit > summary.qa { list-style: none; }
+.mp-form { margin-top: 8px; padding: 12px; border: 1px solid var(--rule); border-radius: 8px; background: var(--sheet); }
+.mp-form .pf-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
 .qa {
   display: flex;
   align-items: center;
@@ -129,7 +142,6 @@
 .status-btn .pill { padding: 1px 9px; font-size: 0.8125rem; }
 .status-text { flex: 1; min-width: 0; color: var(--muted); font-size: 0.8125rem; }
 .status-change { color: var(--ai); font-size: 0.8125rem; font-weight: 700; }
-.seg.turn { margin: 0 0 4px; }
 
 .state-final { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 6px 0 10px; color: var(--muted); font-size: 0.875rem; }
 .state-final .pill { padding: 2px 12px; font-size: 0.875rem; }
@@ -203,6 +215,11 @@
   font-weight: 700;
 }
 .here.waiting { border: 1.5px solid var(--ink); background: transparent; color: var(--ink); }
+
+/* 調べた募集の情報（畳んでおく） */
+.prog-info { margin: 12px 0 0; border-top: 1px dashed var(--rule); }
+.prog-info summary { padding: 10px 0 4px; color: var(--muted); font-size: 0.8125rem; font-weight: 700; cursor: pointer; }
+.todo-list li { padding: 8px 0; }
 .route-hint { margin: 0 0 8px; font-size: 0.75rem; }
 
 .checklist { margin: 0; padding: 0; list-style: none; }

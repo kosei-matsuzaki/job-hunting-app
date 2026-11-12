@@ -1,16 +1,18 @@
 // 画面: 企業一覧
 
-import { COMPANY_TABS, IN_SELECTION, IND_CLASS, INDUSTRIES, SORTS } from "../config.js";
+import { COMPANY_TABS, IND_CLASS, INDUSTRIES, SORTS } from "../config.js";
 import { daysUntil, fmtDate, remainText, urgency } from "../dates.js";
 import { esc } from "../md.js";
-import { byWhen, companyState, nextEvent } from "../model.js";
-import { avatar, companyStatusLine, ICONS, stars } from "../parts.js";
+import { byWhen, companyState, hasLogin, nextEvent } from "../model.js";
+import { avatar, companyStatusLine, ICONS, loginButtons, stars } from "../parts.js";
 import { state, ui } from "../store.js";
 
-function currentTab() {
+export function currentTab() {
   if (COMPANY_TABS.some((t) => t.v === ui.ctab)) return ui.ctab;
-  return state.companies.some((c) => IN_SELECTION.has(companyState(c)) || companyState(c) === "offer") ? "active" : "plan";
+  return state.companies.some((c) => COMPANY_TABS[0].test(companyState(c))) ? "active" : "plan";
 }
+
+export const searching = () => !!ui.cq.trim();
 
 export function companyPool() {
   const q = ui.cq.trim().toLowerCase();
@@ -38,7 +40,8 @@ export function companyRows() {
   }[ui.sort] || byDeadline;
   const tab = currentTab();
   const test = COMPANY_TABS.find((t) => t.v === tab).test;
-  const items = companyPool().filter((c) => test(companyState(c))).sort(order);
+  // 名前で探しているときは、タブに関係なく全部の企業から出す（ログイン情報を引くため）
+  const items = companyPool().filter((c) => searching() || test(companyState(c))).sort(order);
 
   const row = (c) => {
     const nx = nextEvent(c);
@@ -54,24 +57,20 @@ export function companyRows() {
           </span>
           <span class="co-ind"><i class="ind-dot ${IND_CLASS[c.industry] || "other"}"></i>${esc(c.industry || "")}</span>
         </a>
-        ${tab === "watch" ? `<div class="triage">
-          <button class="mini primary" data-triage="${esc(c.slug)}:plan">応募予定にする</button>
-          <button class="mini" data-triage="${esc(c.slug)}:skip">見送る</button>
-        </div>` : ""}
+        ${hasLogin(c) ? `<div class="co-login">${loginButtons(c)}</div>` : ""}
       </li>`;
   };
   const hints = {
-    active: "選考が進んでいる企業と内定。",
-    plan: "応募すると決めた企業。締切がホームに出ます。",
-    watch: "候補の企業。応募するなら「応募予定にする」、しないなら「見送る」。",
+    active: "選考中の企業と内定。",
+    plan: "まだ応募していない企業。締切はホームと予定に出ます。応募しないと決めたら、企業ページで「見送り」に。",
     closed: "見送り・辞退・不合格の企業。",
   };
   const empty = {
-    active: "選考中の企業はまだありません。応募したら、企業ページの状況を「対応中」にしてください。",
-    plan: "応募予定の企業はまだありません。「気になる」タブから選べます。",
-    watch: "「気になる」企業はありません。",
+    active: "選考中の企業はまだありません。応募したら、企業ページで「応募した」を押してください。",
+    plan: "応募前の企業はありません。",
     closed: "終了した企業はありません。",
   };
+  if (searching()) return items.length ? `<ul class="co-list">${items.map(row).join("")}</ul>` : `<p class="empty">見つかりません。</p>`;
   return `<p class="hint tab-hint">${hints[tab]}</p>` + (items.length ? `<ul class="co-list">${items.map(row).join("")}</ul>` : `<p class="empty">${empty[tab]}</p>`);
 }
 
@@ -88,10 +87,10 @@ export function viewCompanies() {
     </header>
     <div class="co-controls">
     <div class="ctabs" role="tablist" aria-label="状況">
-      ${COMPANY_TABS.map((t) => `<button role="tab" data-ctab="${t.v}" aria-selected="${t.v === tab}">${t.label}<span>${pool.filter((c) => t.test(companyState(c))).length}</span></button>`).join("")}
+      ${COMPANY_TABS.map((t) => `<button role="tab" data-ctab="${t.v}" aria-selected="${!searching() && t.v === tab}">${t.label}<span>${pool.filter((c) => t.test(companyState(c))).length}</span></button>`).join("")}
     </div>
     <div class="filter-bar">
-      <input id="cq" class="search-box" type="search" placeholder="企業名で探す" value="${esc(ui.cq)}" enterkeyhint="search">
+      <input id="cq" class="search-box" type="search" placeholder="企業名で探す（ログインもここから）" value="${esc(ui.cq)}" enterkeyhint="search">
       <select id="co-sort" aria-label="並び順">${SORTS.map((o) => `<option value="${o.v}"${o.v === ui.sort ? " selected" : ""}>${o.label}</option>`).join("")}</select>
     </div>
     <div class="chips" role="group" aria-label="業界">

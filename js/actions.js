@@ -1,39 +1,11 @@
 // 保存を伴う操作（元に戻せる）
 
-import { ENDED, IN_SELECTION, STATES } from "./config.js";
+import { ENDED, STATES } from "./config.js";
 import { commit, MERGED } from "./data.js";
 import { isoToday } from "./dates.js";
 import { bySlug, flowIndex, programOf } from "./model.js";
 import { render } from "./render.js";
 import { toast } from "./toast.js";
-
-// 一覧から「応募予定にする」「見送る」: 気になる状態のルートをまとめて変える
-export async function triage(slug, to) {
-  const c = bySlug(slug);
-  if (!c) return;
-  const targets = c.programs.filter((p) => p.state === "watch").map((p) => p.id);
-  const ids = targets.length ? targets : c.programs.map((p) => p.id);
-  const note = to === "plan" ? "応募予定にした" : "見送りにした";
-  const ok = await commit(() => {
-    const x = bySlug(slug);
-    if (!x) return;
-    for (const p of x.programs) if (ids.includes(p.id)) p.state = to;
-    x.lastAction = isoToday();
-    x.history = [{ date: isoToday(), text: note }, ...(x.history || [])];
-  }, `${c.name}: ${note}`, { quiet: true });
-  render();
-  if (!ok) return;
-  undoable(`${c.name}を${to === "plan" ? "応募予定" : "見送り"}にしました`, async () => {
-    await commit(() => {
-      const x = bySlug(slug);
-      if (!x) return;
-      for (const p of x.programs) if (ids.includes(p.id)) p.state = "watch";
-      const i = (x.history || []).findIndex((h) => h.text === note);
-      if (i >= 0) x.history.splice(i, 1);
-    }, `${c.name}: 取り消し（${note}）`);
-    render();
-  }, ok);
-}
 
 export const undoable = (message, undo, result = true) =>
   toast(result === MERGED ? "別の端末の変更と合わせて保存しました" : message, false, { label: "元に戻す", run: undo });
@@ -94,7 +66,7 @@ export function statusClick(t) {
     const p = programOf(bySlug(slug), pid);
     if (!p || p.state === next) return;
     if (ENDED.has(next) && !confirm(`「${STATES[next].label}」にします。`)) return;
-    const note = IN_SELECTION.has(next) && ENDED.has(p.state) ? "選考中に戻した" : `「${STATES[next].label}」にした`;
+    const note = next === "todo" && ENDED.has(p.state) ? "選考中に戻した" : `「${STATES[next].label}」にした`;
     return updateProgram(slug, pid, { state: next }, note);
   }
   if (t.dataset.step) {
@@ -103,17 +75,71 @@ export function statusClick(t) {
     const step = p.flow[Number(i)];
     if (p.step === step) return;
     const patch = { step };
-    if (!IN_SELECTION.has(p.state)) patch.state = "todo";
+    if (p.state !== "todo") patch.state = "todo";
     return updateProgram(slug, pid, patch, `段階を「${step}」にした`);
   }
   if (t.dataset.pass) {
     const [slug, pid] = t.dataset.pass.split(":");
     const p = programOf(bySlug(slug), pid);
     const idx = flowIndex(p);
-    if (!IN_SELECTION.has(p.state) || idx < 0) {
+    if (p.state !== "todo" || idx < 0) {
       return updateProgram(slug, pid, { step: p.flow[0] || "", state: "todo" }, `応募した${p.flow[0] ? `（${p.flow[0]}）` : ""}`);
     }
     if (idx + 1 < p.flow.length) return updateProgram(slug, pid, { step: p.flow[idx + 1], state: "todo" }, `${p.flow[idx]}を通過した`);
     return updateProgram(slug, pid, { state: "offer" }, `${p.flow[idx]}を通過して内定`);
   }
+}
+
+// 企業ページで直接書き換えるもの: マイページ・やること・記録
+export async function saveMypage(slug, mypage) {
+  const c = bySlug(slug);
+  if (!c) return;
+  await commit(() => {
+    const x = bySlug(slug);
+    if (x) x.mypage = { ...mypage };
+  }, `${c.name}: マイページを登録`);
+  render();
+}
+
+export async function addTodo(slug, text) {
+  const c = bySlug(slug);
+  if (!c || !text) return;
+  await commit(() => {
+    const x = bySlug(slug);
+    if (x && !x.todo.includes(text)) x.todo = [...x.todo, text];
+  }, `${c.name}: やること「${text}」を追加`, { quiet: true });
+  render();
+}
+
+export async function finishTodo(slug, text, { undo = true } = {}) {
+  const c = bySlug(slug);
+  if (!c) return;
+  const at = c.todo.indexOf(text);
+  const ok = await commit(() => {
+    const x = bySlug(slug);
+    if (x) x.todo = x.todo.filter((t) => t !== text);
+  }, `${c.name}: やること「${text}」を済みに`, { quiet: undo });
+  render();
+  if (ok && undo) {
+    undoable("済みにしました", async () => {
+      await commit(() => {
+        const x = bySlug(slug);
+        if (x && !x.todo.includes(text)) x.todo.splice(Math.max(0, Math.min(at, x.todo.length)), 0, text);
+      }, `${c.name}: やること「${text}」を戻す`);
+      render();
+    }, ok);
+  }
+}
+
+export async function addRecord(slug, text) {
+  const c = bySlug(slug);
+  if (!c || !text) return;
+  const date = isoToday();
+  await commit(() => {
+    const x = bySlug(slug);
+    if (!x || x.history.some((h) => h.date === date && h.text === text)) return;
+    x.history = [{ date, text }, ...x.history];
+    x.lastAction = date;
+  }, `${c.name}: ${text}`);
+  render();
 }

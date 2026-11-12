@@ -3,9 +3,8 @@
 import { WD } from "../config.js";
 import { addDays, dayLabel, fmtDate, isoOf, isoToday, parseDate } from "../dates.js";
 import { esc } from "../md.js";
-import { allEvents, byWhen, isEnded, isTracked } from "../model.js";
+import { allEvents, byWhen, isEnded } from "../model.js";
 import { eventRow, ICONS } from "../parts.js";
-import { ui } from "../store.js";
 
 export function viewCalendar(sel) {
   const selected = /^\d{4}-\d{2}-\d{2}$/.test(sel || "") ? sel : isoToday();
@@ -16,7 +15,7 @@ export function viewCalendar(sel) {
   const daysInMonth = new Date(y, m + 1, 0).getDate();
   const weeks = Math.ceil((first.getDay() + daysInMonth) / 7);
   const start = addDays(first, -first.getDay());
-  const events = allEvents().filter((e) => !isEnded(e.c) && (ui.calAll || isTracked(e.c)));
+  const events = allEvents().filter((e) => !isEnded(e.c));
   const byDate = new Map();
   for (const e of events) {
     if (!byDate.has(e.date)) byDate.set(e.date, []);
@@ -33,10 +32,6 @@ export function viewCalendar(sel) {
       <a class="icon-btn" href="#/calendar/${next}" aria-label="次の月">›</a>
       <a class="btn small" href="#/calendar/${isoToday()}">今日</a>
     </header>
-    <div class="seg small cal-scope" role="group" aria-label="表示する企業">
-      <button data-calall="0" aria-pressed="${!ui.calAll}">応募予定・選考中</button>
-      <button data-calall="1" aria-pressed="${ui.calAll}">気になる企業も</button>
-    </div>
     <div class="cal" role="grid" aria-label="${y}年${m + 1}月">
       <div class="cal-row cal-wd" role="row">${[...WD].map((w, i) => `<span role="columnheader" class="${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</span>`).join("")}</div>`;
   for (let w = 0; w < weeks; w++) {

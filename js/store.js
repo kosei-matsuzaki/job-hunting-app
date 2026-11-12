@@ -18,7 +18,6 @@ export const ui = {
   industry: store.get("jh.industry") || "",
   kind: store.get("jh.kind") || "",
   ctab: store.get("jh.ctab") || "",
-  calAll: store.get("jh.calAll") === "1",
   sort: store.get("jh.sort") || "deadline",
   cq: "",
   q: "",

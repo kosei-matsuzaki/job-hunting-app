@@ -1,12 +1,12 @@
 // 画面: 企業ページ
 
-import { ENDED, IN_SELECTION, KIND_CLASS, PRIORITY_LABEL, STATE_GROUPS, STATES } from "../config.js";
+import { ENDED, KIND_CLASS, PRIORITY_LABEL, STATE_GROUPS, STATES } from "../config.js";
 import { hasNote } from "../data.js";
 import { daysUntil, fmtDate, remainText, urgency, whenText } from "../dates.js";
 import { googleCalUrl } from "../ics.js";
 import { esc, renderMarkdown } from "../md.js";
-import { bySlug, byWhen, defaultProgram, flowIndex, nextEvent, programOf } from "../model.js";
-import { avatar, eventTitle, ICONS, kindBadge, statePill } from "../parts.js";
+import { bySlug, byWhen, defaultProgram, flowIndex, hasLogin, isWaiting, nextEvent, programOf } from "../model.js";
+import { avatar, eventTitle, ICONS, kindBadge, progPill, statePill } from "../parts.js";
 import { companyPieces } from "./docs.js";
 import { state } from "../store.js";
 
@@ -20,9 +20,9 @@ function programPanel(c, p) {
       <div class="prog-head">
         ${kindBadge(p.kind)}
         <h2 class="prog-title">${esc(p.title || p.kind)}</h2>
-        ${p.status && p.status !== "不明" ? `<span class="open ${p.status === "受付中" ? "on" : ""}">${esc(p.status)}</span>` : ""}
+        ${p.status && p.status !== "不明" ? `<span class="open ${p.status === "受付中" ? "on" : ""}" title="募集の受付">${esc(p.status)}</span>` : ""}
       </div>
-      ${p.period ? `<p class="prog-period">受付・時期: ${esc(p.period)}</p>` : ""}`;
+      ${p.period ? `<p class="prog-period">${esc(p.period)}</p>` : ""}`;
   const nx = nextEvent(c, p.id);
   if (nx) {
     const n = daysUntil(nx.date);
@@ -30,22 +30,16 @@ function programPanel(c, p) {
   }
 
   // 状況: 押すとシートで選べる
+  const waiting = isWaiting(c, p);
   html += `<button class="status-btn ${s}" data-sheet="${key}" aria-haspopup="dialog">
-      ${statePill(s)}<span class="status-text">${esc(STATES[s].long || STATES[s].hint)}</span><span class="status-change">変更</span>
+      ${progPill(c, p)}<span class="status-text">${esc(waiting ? "これからの予定がない。連絡が来たら段階を進めるか予定を足す" : STATES[s].hint)}</span><span class="status-change">変更</span>
     </button>`;
-
-  if (IN_SELECTION.has(s)) {
-    html += `<div class="seg small turn" role="group" aria-label="いまはどちらの番か">
-      <button data-state="${key}:todo" aria-pressed="${s === "todo"}">自分の番</button>
-      <button data-state="${key}:waiting" aria-pressed="${s === "waiting"}">結果待ち</button>
-    </div>`;
-  }
 
   if (p.flow.length) {
     html += `<ol class="route${ENDED.has(s) ? " dim" : ""}">`;
     p.flow.forEach((name, i) => {
       const cls = s === "offer" || i < idx ? "past" : i === idx ? "now" : "";
-      const tag = i === idx && IN_SELECTION.has(s) ? `<span class="here ${s}">${STATES[s].label}</span>` : "";
+      const tag = i === idx && s === "todo" ? `<span class="here${waiting ? " waiting" : ""}">${waiting ? "結果待ち" : "いま"}</span>` : "";
       html += `<li class="${cls}"><button class="station" data-step="${key}:${i}" aria-label="段階を「${esc(name)}」にする">
         <span class="st"></span><span class="route-name">${esc(name)}</span>${tag}</button></li>`;
     });
@@ -53,14 +47,9 @@ function programPanel(c, p) {
   }
 
   // いま一番よく押すボタンを1つだけ大きく出す
-  if (s === "watch") {
-    html += `<div class="actions-row">
-      <button class="btn primary" data-state="${key}:plan">応募予定にする</button>
-      <button class="btn" data-pass="${key}">もう応募した</button>
-    </div>`;
-  } else if (s === "plan") {
+  if (s === "plan") {
     html += `<button class="btn primary wide" data-pass="${key}">応募した${p.flow[0] ? `（${esc(p.flow[0])}から選考開始）` : ""}</button>`;
-  } else if (IN_SELECTION.has(s) && p.flow.length) {
+  } else if (s === "todo" && p.flow.length) {
     const nextStep = idx >= 0 ? p.flow[idx + 1] : p.flow[0];
     const label = idx < 0 ? `選考を始める（${p.flow[0]}から）` : nextStep ? `${p.flow[idx]}を通過した（次は${nextStep}）` : `${p.flow[idx]}を通過した（内定）`;
     html += `<button class="btn primary wide" data-pass="${key}">${esc(label)}</button>`;
@@ -73,13 +62,17 @@ function programPanel(c, p) {
       : `<a class="btn ghost wide" href="#/docs">ESの素材を開く</a>`;
   }
 
-  if (p.process) html += `<h3 class="sub">選考プロセス</h3><div class="md prog-process">${renderMarkdown(p.process)}</div>`;
+  // 調べた募集の情報は畳んでおく
   const links = [
     p.url && `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">募集ページ</a>`,
     p.entryUrl && `<a href="${esc(p.entryUrl)}" target="_blank" rel="noopener noreferrer">エントリー</a>`,
     p.source && p.source !== p.url && `<a class="faint" href="${esc(p.source)}" target="_blank" rel="noopener noreferrer">出典</a>`,
   ].filter(Boolean);
-  if (links.length) html += `<p class="prog-links">${links.join("")}</p>`;
+  if (p.process || links.length) {
+    html += `<details class="prog-info"><summary>選考プロセス・募集ページ</summary>
+      ${p.process ? `<div class="md prog-process">${renderMarkdown(p.process)}</div>` : ""}
+      ${links.length ? `<p class="prog-links">${links.join("")}</p>` : ""}</details>`;
+  }
   return html + `</section>`;
 }
 
@@ -129,13 +122,49 @@ function esList(c) {
     .join("");
 }
 
+// マイページ: 開く・コピーをいちばん上に。未登録ならその場で登録する
+function loginCard(c) {
+  const m = c.mypage;
+  const slug = esc(c.slug);
+  const form = `<form class="mp-form" data-mypage="${slug}">
+      <label>マイページのURL<input type="url" name="url" value="${esc(m.url)}" autocapitalize="off"></label>
+      <div class="pf-row">
+        <label>ID<input name="id" value="${esc(m.id)}" autocapitalize="off" autocomplete="off"></label>
+        <label>パスワード<input name="password" value="${esc(m.password)}" autocapitalize="off" autocomplete="off"></label>
+      </div>
+      <button class="btn primary small" type="submit">保存する</button>
+    </form>`;
+  const recruit = c.recruitUrl
+    ? `<a class="qa" href="${esc(c.recruitUrl)}" target="_blank" rel="noopener noreferrer">${ICONS.globe}<span>採用ページ</span></a>`
+    : "";
+  if (!hasLogin(c)) {
+    return `<section class="login-card">
+      ${recruit ? `<nav class="quick">${recruit}</nav>` : ""}
+      <details class="mp-edit"><summary class="qa muted">${ICONS.key}<span>マイページを登録する</span></summary>${form}</details>
+    </section>`;
+  }
+  return `<section class="login-card">
+    <nav class="quick" aria-label="よく使うリンク">
+      ${recruit}
+      ${m.url ? `<a class="qa" href="${esc(m.url)}" target="_blank" rel="noopener noreferrer">${ICONS.door}<span>マイページ</span></a>` : ""}
+      ${m.id ? `<button class="qa" data-copy="${esc(m.id)}" data-copy-label="ID">${ICONS.id}<span>IDをコピー</span></button>` : ""}
+      ${m.password ? `<button class="qa" data-copy="${esc(m.password)}" data-copy-label="パスワード">${ICONS.key}<span>PWをコピー</span></button>` : ""}
+    </nav>
+    <div class="cred">
+      ${m.id ? `<span>ID <code>${esc(m.id)}</code></span>` : ""}
+      ${m.password ? `<span>PW <button class="pw-mask" data-reveal="${esc(m.password)}" aria-label="パスワードを表示">••••••</button></span>` : ""}
+      <details class="mp-edit"><summary>変更</summary>${form}</details>
+    </div>
+  </section>`;
+}
+
 export function viewCompany(slug, pid) {
   const c = bySlug(slug);
   if (!c) return `<p class="empty">この企業は見つかりません。<a href="#/companies">企業一覧に戻る</a></p>`;
   const p = programOf(c, pid) || defaultProgram(c);
-  const m = c.mypage;
   const meta = [c.industry, c.salary ? `初任給 ¥${Number(c.salary).toLocaleString()}` : "", c.lastAction ? `最終更新 ${fmtDate(c.lastAction, true)}` : ""].filter(Boolean);
   const avg = c.avgSalary ? `<p class="meta avg">${esc(c.avgSalary)}</p>` : "";
+  const slugE = esc(c.slug);
 
   let html = `
     <a class="back" href="#/companies">企業</a>
@@ -146,32 +175,27 @@ export function viewCompany(slug, pid) {
         <p class="meta">${meta.map(esc).join("　")}</p>
         ${avg}
         <div class="stars" role="group" aria-label="志望度">
-          ${[1, 2, 3].map((n) => `<button data-prio="${esc(c.slug)}:${n}" aria-pressed="${n <= (c.priority || 0)}" aria-label="志望度 ${n}">★</button>`).join("")}
+          ${[1, 2, 3].map((n) => `<button data-prio="${slugE}:${n}" aria-pressed="${n <= (c.priority || 0)}" aria-label="志望度 ${n}">★</button>`).join("")}
           <span class="stars-label">${esc(PRIORITY_LABEL[c.priority] || "志望度")}</span>
         </div>
       </div>
-      <a class="icon-btn" href="#/c/${esc(c.slug)}/edit" aria-label="編集">${ICONS.edit}</a>
+      <a class="icon-btn" href="#/c/${slugE}/edit" aria-label="編集">${ICONS.edit}</a>
     </header>
-    <nav class="quick" aria-label="よく使うリンク">
-      ${c.recruitUrl ? `<a class="qa" href="${esc(c.recruitUrl)}" target="_blank" rel="noopener noreferrer">${ICONS.globe}<span>採用ページ</span></a>` : `<a class="qa muted" href="#/c/${esc(c.slug)}/edit">${ICONS.globe}<span>採用ページ未登録</span></a>`}
-      ${m.url ? `<a class="qa" href="${esc(m.url)}" target="_blank" rel="noopener noreferrer">${ICONS.door}<span>マイページ</span></a>` : `<a class="qa muted" href="#/c/${esc(c.slug)}/edit">${ICONS.door}<span>マイページ未登録</span></a>`}
-      ${m.id ? `<button class="qa" data-copy="${esc(m.id)}" data-copy-label="ID">${ICONS.id}<span>IDをコピー</span></button>` : ""}
-      ${m.password ? `<button class="qa" data-copy="${esc(m.password)}" data-copy-label="パスワード">${ICONS.key}<span>PWをコピー</span></button>` : ""}
-    </nav>
+    ${loginCard(c)}
     <div class="co-layout"><div class="co-main">`;
 
   if (c.programs.length > 1) {
     html += `<div class="prog-tabs" role="tablist">${c.programs
-      .map((q) => `<a role="tab" href="#/c/${esc(c.slug)}/${esc(q.id)}" aria-selected="${q.id === p.id}">
+      .map((q) => `<a role="tab" href="#/c/${slugE}/${esc(q.id)}" aria-selected="${q.id === p.id}">
         ${kindBadge(q.kind)}<span class="pt-title">${esc(q.title || q.kind)}</span><span class="pt-state">${statePill(q.state)}</span></a>`)
       .join("")}</div>`;
   }
   html += p
     ? programPanel(c, p)
-    : `<section class="empty-panel">選考ルート（本選考・インターンなど）が登録されていません。<a href="#/c/${esc(c.slug)}/edit">編集から追加</a></section>`;
+    : `<section class="empty-panel">選考ルート（本選考・インターンなど）が登録されていません。<a href="#/c/${slugE}/edit">編集から追加</a></section>`;
 
   const events = c.events.map((e, i) => ({ ...e, c, i, p: programOf(c, e.program) })).sort(byWhen);
-  html += `</div><div class="co-side"><section class="card"><h2 class="sec">予定<a class="sec-link" href="#/add?c=${esc(c.slug)}">追加</a></h2>`;
+  html += `</div><div class="co-side"><section class="card"><h2 class="sec">予定<a class="sec-link" href="#/add?c=${slugE}">追加</a></h2>`;
   if (events.length) {
     html += `<ul class="checklist">`;
     for (const e of events) {
@@ -179,9 +203,9 @@ export function viewCompany(slug, pid) {
       const tail = e.done ? "" : n < 0 ? `<span class="late">期限切れ</span>` : `<span class="${urgency(n)}">${esc(remainText(n))}</span>`;
       html += `
         <li class="${e.done ? "done" : ""}">
-          <label><input type="checkbox" data-toggle="${esc(c.slug)}:${e.i}"${e.done ? " checked" : ""}>
+          <label><input type="checkbox" data-toggle="${slugE}:${e.i}"${e.done ? " checked" : ""}>
           <span class="ck-body"><span class="ck-when">${esc(whenText(e))}</span><span class="ck-title">${eventTitle(e, true)}</span>
-          ${e.done ? "" : `<span class="cal-links"><button class="linkish" data-ics="${esc(c.slug)}:${e.i}">カレンダーに追加</button><a href="${esc(googleCalUrl(e, c))}" target="_blank" rel="noopener noreferrer">Googleカレンダー</a></span>`}</span></label>
+          ${e.done ? "" : `<span class="cal-links"><button class="linkish" data-ics="${slugE}:${e.i}">カレンダーに追加</button><a href="${esc(googleCalUrl(e, c))}" target="_blank" rel="noopener noreferrer">Googleカレンダー</a></span>`}</span></label>
           ${tail}
         </li>`;
     }
@@ -191,25 +215,29 @@ export function viewCompany(slug, pid) {
   }
   html += `</section>`;
 
-  if (c.todo.length) html += `<section class="card"><h2 class="sec">調べること・転記すること</h2><ul class="plain-list">${c.todo.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></section>`;
-  if (c.links.length) {
-    html += `<section class="card"><h2 class="sec">リンク</h2><ul class="plain-list">${c.links
-      .map((l) => `<li><a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.label || l.url)}</a></li>`)
-      .join("")}</ul></section>`;
-  }
+  // やること: 済んだらチェックで消える
+  html += `<section class="card"><h2 class="sec">やること${c.todo.length ? `<span class="count">${c.todo.length}</span>` : ""}</h2>
+    ${c.todo.length ? `<ul class="checklist todo-list">${c.todo
+      .map((t) => `<li><label><input type="checkbox" data-todo-done="${slugE}" value="${esc(t)}"><span class="ck-body"><span class="ck-title">${esc(t)}</span></span></label></li>`)
+      .join("")}</ul>` : ""}
+    <form class="inline-add" data-todo="${slugE}"><input name="text" placeholder="調べること・転記することなど" aria-label="やることを追加" required><button class="mini" type="submit">追加</button></form>
+  </section>`;
+
   html += `<section class="card"><h2 class="sec">ES・企業研究</h2>`;
   html += hasNote(c.slug)
     ? esList(c) + `<a class="btn ghost wide" href="#/doc/${encodeURIComponent(`notes/${c.slug}.md`)}">ノートを開く</a>`
     : state.docs
-      ? `<button class="btn ghost wide" data-newnote="${esc(c.slug)}">ノートを作る</button>`
+      ? `<button class="btn ghost wide" data-newnote="${slugE}">ノートを作る</button>`
       : `<p class="hint">読み込み中…</p>`;
   html += `</section></div><div class="co-extra">`;
-  if (c.memo?.trim()) html += `<section class="card"><h2 class="sec">メモ</h2><div class="md">${renderMarkdown(c.memo)}</div></section>`;
-  if (c.history.length) {
-    html += `<section class="card"><h2 class="sec">これまでの記録</h2><ol class="history">${c.history
+  html += `<section class="card"><h2 class="sec">メモ<a class="sec-link" href="#/c/${slugE}/edit">編集</a></h2>${
+    c.memo?.trim() ? `<div class="md">${renderMarkdown(c.memo)}</div>` : `<p class="hint">調べたことや出典はここに。</p>`}</section>`;
+  html += `<section class="card"><h2 class="sec">記録</h2>
+    <form class="inline-add" data-record="${slugE}"><input name="text" placeholder="例: ESを出した。結果は11/25までに通知" aria-label="記録を書く" required><button class="mini" type="submit">書く</button></form>
+    ${c.history.length ? `<ol class="history">${c.history
       .slice(0, 30)
       .map((h) => `<li><span class="h-date">${esc(fmtDate(h.date))}</span>${esc(h.text)}</li>`)
-      .join("")}</ol></section>`;
-  }
+      .join("")}</ol>` : ""}
+  </section>`;
   return html + `</div></div>`;
 }

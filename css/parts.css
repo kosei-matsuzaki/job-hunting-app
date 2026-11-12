@@ -58,9 +58,7 @@
   white-space: nowrap;
 }
 .pill.todo { background: var(--ink); color: var(--paper); }
-.pill.waiting { background: transparent; }
 .pill.plan { border-style: dashed; color: var(--muted); border-color: var(--muted); }
-.pill.watch { border: 1px dotted var(--faint); color: var(--muted); font-weight: 500; }
 .pill.offer { border: 3px double var(--shu); color: var(--shu); transform: rotate(-3deg); }
 .pill.declined, .pill.rejected, .pill.skip { border-color: transparent; color: var(--faint); text-decoration: line-through; font-weight: 500; }
 
@@ -78,6 +76,16 @@
 .tag.event { background: var(--ai-soft); color: var(--ai); }
 .tag.tentative { margin: 0 0 0 6px; border: 1px dashed var(--faint); background: none; }
 .tag.prog { border: 1px solid currentColor; background: none; }
+.tag.wait { margin: 0; border: 1px solid var(--ink); background: none; color: var(--ink); }
+
+/* マイページのパスワード: 押すと表示 */
+.pw-mask { padding: 0; border: 0; background: none; color: var(--faint); font-family: var(--mono); font-size: 0.8125rem; letter-spacing: 0.08em; cursor: pointer; }
+.pw-mask.shown { color: var(--ink); letter-spacing: 0; }
+
+/* 1行で書き足すフォーム（やること・記録） */
+.inline-add { display: flex; gap: 8px; margin: 10px 0 4px; }
+.inline-add input { flex: 1; min-width: 0; min-height: 38px; font-size: 0.875rem; }
+.inline-add .mini { flex: none; min-width: 52px; }
 
 .stars-mini { margin-left: 6px; color: var(--shu); font-size: 0.6875rem; letter-spacing: -0.05em; }
 
@@ -128,7 +136,7 @@
 .tick svg { width: 18px; height: 18px; stroke-width: 2.4; }
 .tick:hover { border-color: var(--ink); color: var(--ink); }
 
-.active-list, .co-list, .login-list, .doc-list, .results { margin: 0; padding: 0; list-style: none; }
+.active-list, .co-list, .doc-list, .results { margin: 0; padding: 0; list-style: none; }
 .active-row, .co-row {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -155,7 +163,7 @@
 .route-mini .st.now { border-color: var(--shu); background: var(--shu); }
 
 @media (min-width: 760px) {
-  .co-list, .login-list, .doc-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 0 32px; }
+  .co-list, .doc-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 0 32px; }
 }
 
 /* 本人が書いた文章（正典）: 墨の角印を塗りつぶしたもの */

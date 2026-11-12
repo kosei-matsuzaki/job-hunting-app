@@ -72,7 +72,7 @@ export function viewEdit(slug) {
       </section>
 
       <h2 class="sec">選考ルート</h2>
-      <p class="hint">本選考とインターンなど、選考が別れているものはルートを分けます。状況と段階は企業ページで変えます。</p>
+      <p class="hint">本選考とインターンなど、選考が分かれているものはルートを分けます。状況と段階は企業ページで変えます。</p>
       <div id="programs">${c.programs.map(programFieldset).join("")}</div>
       <button type="button" class="btn ghost wide" data-add-prog>${ICONS.plus}選考ルートを追加</button>
 
@@ -82,9 +82,8 @@ export function viewEdit(slug) {
 
       <h2 class="sec">そのほか</h2>
       <section class="sheet form-sheet">
-        <label>リンク（1行に「表示名 | URL」）<textarea name="links" rows="3">${esc(c.links.map((l) => `${l.label} | ${l.url}`).join("\n"))}</textarea></label>
-        <label>調べること・転記すること（1行に1つ）<textarea name="todo" rows="3">${esc(c.todo.join("\n"))}</textarea></label>
-        <label>メモ（Markdown）<textarea name="memo" rows="8">${esc(c.memo || "")}</textarea></label>
+        <label>メモ（Markdown。調べたこと・出典・リンクなど）<textarea name="memo" rows="10">${esc(c.memo || "")}</textarea></label>
+        <label>やること（1行に1つ。企業ページでチェックすると消える）<textarea name="todo" rows="3">${esc(c.todo.join("\n"))}</textarea></label>
       </section>
 
       <div class="form-actions">
@@ -136,11 +135,6 @@ export function readForm(form) {
     mypage: { url: get("mpUrl"), id: get("mpId"), password: get("mpPassword") },
     programs,
     events: [...form.querySelectorAll("fieldset.ev")].map(readEvent).filter((e) => e.title || e.date),
-    links: lines("links").map((l) => {
-      const [label, ...rest] = l.split("|");
-      const url = rest.join("|").trim() || label.trim();
-      return { label: rest.length ? label.trim() : url, url };
-    }),
     todo: lines("todo"),
     memo: get("memo"),
   };

@@ -1,6 +1,6 @@
 // 画面の操作を受け取る
 
-import { markDone, statusClick, triage, undoable } from "./actions.js";
+import { addRecord, addTodo, finishTodo, markDone, saveMypage, statusClick, undoable } from "./actions.js";
 import { DEFAULT_FLOW, PRIORITY_LABEL } from "./config.js";
 import { commit, DOC_KEY, loadCompanies, loadDocList, newId, normalize } from "./data.js";
 import { daysUntil, isoToday } from "./dates.js";
@@ -37,18 +37,10 @@ document.addEventListener("click", async (ev) => {
   if (t.dataset.done) return markDone(t.dataset.done);
   if (t.dataset.state || t.dataset.step || t.dataset.pass) return statusClick(t);
   if (t.dataset.sheet) return openSheet(t.dataset.sheet);
-  if (t.dataset.triage) {
-    const [slug, to] = t.dataset.triage.split(":");
-    return triage(slug, to);
-  }
   if (t.dataset.ctab) {
     ui.ctab = t.dataset.ctab;
+    ui.cq = "";
     store.set("jh.ctab", ui.ctab);
-    return render();
-  }
-  if (t.dataset.calall !== undefined) {
-    ui.calAll = t.dataset.calall === "1";
-    store.set("jh.calAll", ui.calAll ? "1" : "0");
     return render();
   }
   if (t.dataset.prio) {
@@ -135,7 +127,7 @@ document.addEventListener("click", async (ev) => {
   }
   if (t.hasAttribute("data-logout")) {
     if (!confirm("この端末からトークンとデータの控えを削除します。")) return;
-    ["jh.token", "jh.cache", "jh.repo", "jh.doclist", "jh.industry", "jh.kind"].forEach((k) => store.del(k));
+    ["jh.token", "jh.cache", "jh.repo", "jh.doclist", "jh.industry", "jh.kind", "jh.ctab", "jh.sort", "jh.calAll"].forEach((k) => store.del(k));
     try {
       Object.keys(localStorage).filter((k) => k.startsWith(DOC_KEY)).forEach((k) => store.del(k));
     } catch { /* noop */ }
@@ -155,6 +147,7 @@ document.addEventListener("click", (ev) => {
 document.addEventListener("change", (ev) => {
   const t = ev.target;
   if (t.dataset.toggle) return markDone(t.dataset.toggle, t.checked);
+  if (t.dataset.todoDone) return finishTodo(t.dataset.todoDone, t.value);
   // 予定の追加: 企業を選んだら、その企業の選考ルートを選べるようにする
   if (t.name === "company" && t.closest("#addev")) {
     const c = bySlug(t.value);
@@ -169,6 +162,20 @@ document.addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const form = ev.target;
   const button = form.querySelector('[type="submit"]');
+
+  // 企業ページで直接書くもの
+  if (form.dataset.mypage) {
+    const fd = new FormData(form);
+    const get = (k) => String(fd.get(k) ?? "").trim();
+    return saveMypage(form.dataset.mypage, { url: get("url"), id: get("id"), password: get("password") });
+  }
+  if (form.dataset.todo || form.dataset.record) {
+    const text = form.text.value.trim();
+    if (!text) return;
+    button.disabled = true;
+    await (form.dataset.todo ? addTodo(form.dataset.todo, text) : addRecord(form.dataset.record, text));
+    return;
+  }
 
   if (form.id === "login" || form.id === "settings") {
     const fd = new FormData(form);
@@ -216,7 +223,7 @@ document.addEventListener("submit", async (ev) => {
       // 状況と段階はフォームにないので、同じ id の選考ルートから引き継ぐ
       const programs = data.programs.map((p) => {
         const old = programOf(c, p.id);
-        return { ...p, state: old?.state || "watch", step: old?.step || "" };
+        return { ...p, state: old?.state || "plan", step: old?.step || "" };
       });
       Object.assign(c, structuredClone({ ...data, programs }));
       if (!c.salary) delete c.salary;

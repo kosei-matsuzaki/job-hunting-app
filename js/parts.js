@@ -1,9 +1,9 @@
 // 画面の部品
 
-import { IN_SELECTION, IND_CLASS, KIND_CLASS, LIVE, PRIORITY_LABEL, STATE_RANK, STATES } from "./config.js";
+import { IND_CLASS, KIND_CLASS, PRIORITY_LABEL, STATES } from "./config.js";
 import { daysUntil, fmtDate, remainText, urgency } from "./dates.js";
 import { esc } from "./md.js";
-import { companyState, flowIndex } from "./model.js";
+import { companyState, defaultProgram, flowIndex, isWaiting } from "./model.js";
 
 export const ICONS = {
   globe: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg>',
@@ -23,6 +23,19 @@ export function avatar(c, size = "") {
 export const kindBadge = (kind) => `<span class="kind ${KIND_CLASS[kind] || "main"}">${esc(kind)}</span>`;
 
 export const statePill = (s) => `<span class="pill ${s}">${STATES[s].label}</span>`;
+
+// ルートの状況。選考中でこれからの予定がなければ「結果待ち」を添える
+export const progPill = (c, p) => statePill(p.state) + (isWaiting(c, p) ? '<span class="tag wait">結果待ち</span>' : "");
+
+// マイページを開く・ID と PW をコピーするボタン
+export function loginButtons(c) {
+  const m = c.mypage;
+  return [
+    m.url && `<a class="mini" href="${esc(m.url)}" target="_blank" rel="noopener noreferrer">${ICONS.door}マイページ</a>`,
+    m.id && `<button class="mini" data-copy="${esc(m.id)}" data-copy-label="ID">${ICONS.id}ID</button>`,
+    m.password && `<button class="mini" data-copy="${esc(m.password)}" data-copy-label="パスワード">${ICONS.key}PW</button>`,
+  ].filter(Boolean).join("");
+}
 
 export const stars = (c) => (c.priority ? `<span class="stars-mini" title="志望度: ${PRIORITY_LABEL[c.priority]}">${"★".repeat(c.priority)}</span>` : "");
 
@@ -46,11 +59,11 @@ export function routeMini(p) {
 // 一覧用の状況: 選考中なら段階つき、それ以外は状況と受付状況
 export function companyStatusLine(c) {
   const s = companyState(c);
-  const lead = [...c.programs].sort((a, b) => STATE_RANK[a.state] - STATE_RANK[b.state])[0];
-  if (lead && IN_SELECTION.has(s)) {
-    return `${routeMini(lead)}${lead.step ? `<b class="co-step">${esc(lead.step)}</b>` : ""}${statePill(s)}${c.programs.length > 1 ? kindBadge(lead.kind) : ""}`;
+  const lead = defaultProgram(c);
+  if (lead && s === "todo") {
+    return `${routeMini(lead)}${lead.step ? `<b class="co-step">${esc(lead.step)}</b>` : ""}${progPill(c, lead)}${c.programs.length > 1 ? kindBadge(lead.kind) : ""}`;
   }
-  const open = c.programs.some((p) => LIVE.includes(p.state) && p.status === "受付中");
+  const open = c.programs.some((p) => p.state === "plan" && p.status === "受付中");
   const kinds = [...new Set(c.programs.filter((p) => p.kind !== "説明会・イベント").map((p) => p.kind))];
   return `${statePill(s)}${open ? '<span class="open-dot">受付中</span>' : ""}<span class="co-kinds">${kinds.map(esc).join("・")}</span>`;
 }

@@ -1,6 +1,6 @@
 // 画面: 素材
 
-import { EPISODES_PATH, EXTRA_DOCS, IN_SELECTION, STATE_RANK, TOPICS } from "../config.js";
+import { EPISODES_PATH, EXTRA_DOCS, STATE_RANK, TOPICS } from "../config.js";
 import { fmtDate } from "../dates.js";
 import { esc, inline, parseMarkdown, plain } from "../md.js";
 import { bySlug, companyState, nextEvent } from "../model.js";
@@ -186,7 +186,7 @@ export function viewDocs() {
     })
     .join("")}</ul>`;
   const missing = state.companies
-    .filter((c) => (IN_SELECTION.has(companyState(c)) || companyState(c) === "plan") && !notePaths().includes(`notes/${c.slug}.md`))
+    .filter((c) => companyState(c) === "todo" && !notePaths().includes(`notes/${c.slug}.md`))
     .sort((a, b) => STATE_RANK[companyState(a)] - STATE_RANK[companyState(b)]);
   if (missing.length) {
     html += `<details class="note-missing"><summary>ノートがない応募予定・選考中の企業<span class="count">${missing.length}</span></summary><ul>${missing

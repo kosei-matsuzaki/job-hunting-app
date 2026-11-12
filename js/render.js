@@ -7,12 +7,11 @@ import { esc } from "./md.js";
 import { companyState } from "./model.js";
 import { cfg, state, store, ui } from "./store.js";
 import { viewCalendar } from "./views/calendar.js";
-import { companyPool, companyRows, viewCompanies } from "./views/companies.js";
+import { companyPool, companyRows, currentTab, searching, viewCompanies } from "./views/companies.js";
 import { viewCompany } from "./views/company.js";
 import { bindDocCounter, viewDoc, viewDocEdit, viewDocs, viewEpisode, viewTopic } from "./views/docs.js";
 import { viewAddEvent, viewEdit } from "./views/edit.js";
 import { viewHome } from "./views/home.js";
-import { viewLogins } from "./views/logins.js";
 import { loadSearchDocs, searchResults, viewSearch } from "./views/search.js";
 import { viewLogin, viewSettings } from "./views/settings.js";
 
@@ -34,6 +33,8 @@ export function renderChrome() {
 }
 
 export async function render() {
+  // ログインの画面は企業の一覧にまとめた
+  if (route().parts[0] === "logins") return void location.replace("#/companies");
   renderChrome();
   const view = $view();
   if (!cfg.token) {
@@ -56,7 +57,6 @@ export async function render() {
     else if (name === "c" && arg) html = viewCompany(arg, sub);
     else if (name === "new") html = viewEdit(null);
     else if (name === "add") html = viewAddEvent(arg, query.get("c"));
-    else if (name === "logins") html = viewLogins();
     else if (name === "docs") html = !arg ? viewDocs() : /^E\d+$/.test(arg) ? viewEpisode(arg) : viewTopic(arg, query);
     else if (name === "search") html = viewSearch();
     else if (name === "settings") html = viewSettings();
@@ -96,15 +96,6 @@ function afterRender(name, sub, arg) {
     if (!ui.q) box.focus();
     loadSearchDocs();
   }
-  if (name === "logins") {
-    const box = document.getElementById("lq");
-    box.addEventListener("input", () => {
-      const q = box.value.trim().toLowerCase();
-      document.querySelectorAll(".login-row").forEach((li) => {
-        li.hidden = !!q && !li.querySelector(".lr-name").textContent.toLowerCase().includes(q);
-      });
-    });
-  }
   if (name === "companies") {
     document.getElementById("co-sort").addEventListener("change", (ev) => {
       ui.sort = ev.target.value;
@@ -119,6 +110,7 @@ function afterRender(name, sub, arg) {
       document.querySelectorAll(".ctabs button").forEach((b) => {
         const t = COMPANY_TABS.find((x) => x.v === b.dataset.ctab);
         b.querySelector("span").textContent = pool.filter((c) => t.test(companyState(c))).length;
+        b.setAttribute("aria-selected", !searching() && b.dataset.ctab === currentTab());
       });
     });
   }
