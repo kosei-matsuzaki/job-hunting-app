@@ -141,6 +141,27 @@ export async function getDoc(path, fresh = false) {
   }
 }
 
+// 素材の一部を書き換えて保存する。別の端末が先に保存していたら、最新を読み直して transform を当て直す
+export async function saveDoc(path, transform, message) {
+  let doc = await getDoc(path);
+  for (let attempt = 0; ; attempt++) {
+    const text = transform(doc.text);
+    try {
+      const sha = await writeFile(path, text, doc.sha, message);
+      doc = { text, sha };
+      state.docCache.set(path, doc);
+      store.set(DOC_KEY + path, JSON.stringify(doc));
+      return doc;
+    } catch (e) {
+      if ((e.status === 409 || e.status === 422) && attempt < 2) {
+        doc = await getDoc(path, true);
+        continue;
+      }
+      throw e;
+    }
+  }
+}
+
 // 素材をすべて読み込む（素材の一覧と検索で使う）。新しく読んだものがあれば true
 let loadingAll = null;
 export function loadAllDocs() {

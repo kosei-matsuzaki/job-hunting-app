@@ -1,8 +1,8 @@
 // 画面の操作を受け取る
 
 import { addRecord, addTodo, finishTodo, markDone, saveMypage, statusClick, undoable } from "./actions.js";
-import { DEFAULT_FLOW, PRIORITY_LABEL } from "./config.js";
-import { commit, DOC_KEY, loadCompanies, loadDocList, newId, normalize } from "./data.js";
+import { DEFAULT_FLOW, FINALS_DIR, PRIORITY_LABEL } from "./config.js";
+import { commit, DOC_KEY, loadCompanies, loadDocList, newId, normalize, saveDoc } from "./data.js";
 import { daysUntil, isoToday } from "./dates.js";
 import { explain, writeFile } from "./github.js";
 import { downloadIcs } from "./ics.js";
@@ -12,7 +12,8 @@ import { $view, render, renderChrome } from "./render.js";
 import { cfg, state, store, ui } from "./store.js";
 import { copy, takeToastAction, toast } from "./toast.js";
 import { openSheet } from "./views/company.js";
-import { docName } from "./views/docs.js";
+import { docName, replaceSection } from "./views/docs.js";
+import { finalPath, finalPaths, newFinalText, parseFinal, removeVersion, setVersion } from "./finals.js";
 import { eventFieldset, programFieldset, readEvent, readForm } from "./views/edit.js";
 import { viewLogin } from "./views/settings.js";
 
@@ -112,6 +113,41 @@ document.addEventListener("click", async (ev) => {
       state.docCache.set(path, { text, sha });
       state.docs.find((g) => g.dir === "notes").paths.push(path);
       location.hash = `#/doc/${encodeURIComponent(path)}/edit`;
+    } catch (e) {
+      toast(explain(e), true);
+      t.disabled = false;
+    }
+    return;
+  }
+  // 確定版のテーマを足す
+  if (t.hasAttribute("data-newtheme")) {
+    const name = (prompt("テーマの名前（例: インターン、チェスAI、なぜゲーム業界か）") || "").trim().replace(/[\\/:*?"<>|#]/g, "");
+    if (!name) return;
+    const path = finalPath(name);
+    if (finalPaths().includes(path)) return void (location.hash = `#/docs/final/${encodeURIComponent(name)}`);
+    const text = newFinalText(name);
+    t.disabled = true;
+    try {
+      const sha = await writeFile(path, text, null, `確定版: テーマ「${name}」を追加`);
+      state.docCache.set(path, { text, sha });
+      state.docs.find((g) => g.dir === "profile").paths.push(path);
+      location.hash = `#/docs/final/${encodeURIComponent(name)}`;
+      toast("テーマを足しました。「話・種類・説明を直す」で、使う設問の種類を決めてください");
+    } catch (e) {
+      toast(explain(e), true);
+      t.disabled = false;
+    }
+    return;
+  }
+  if (t.hasAttribute("data-delversion")) {
+    const form = t.closest("form");
+    const head = form.dataset.old;
+    if (!confirm(`「${head}」を消します。`)) return;
+    t.disabled = true;
+    try {
+      await saveDoc(form.dataset.path, (text) => removeVersion(text, head), `確定版: ${form.dataset.file}「${head}」を削除`);
+      toast("消しました");
+      location.hash = `#/docs/final/${encodeURIComponent(form.dataset.file)}`;
     } catch (e) {
       toast(explain(e), true);
       t.disabled = false;
@@ -251,6 +287,42 @@ document.addEventListener("submit", async (ev) => {
     return;
   }
 
+  if (form.id === "finalform") {
+    const { path, file, old } = form.dataset;
+    const v = { head: form.head.value.trim().replace(/^#+\s*/, ""), body: form.body.value.trim(), memo: form.memo.value.trim() };
+    if (!v.head || !v.body) return toast("見出しと本文を書いてください", true);
+    const cur = state.docCache.get(path);
+    if (v.head !== old && cur && parseFinal(path, cur).versions.some((x) => x.head === v.head)) return toast(`「${v.head}」はもうあります。別の見出しにしてください`, true);
+    button.disabled = true;
+    try {
+      await saveDoc(path, (text) => setVersion(text, old, v), `確定版: ${file}「${v.head}」を${old ? "更新" : "追加"}`);
+      toast("保存しました");
+      location.hash = `#/docs/final/${encodeURIComponent(file)}`;
+    } catch (e) {
+      toast(explain(e), true);
+      button.disabled = false;
+    }
+    return;
+  }
+
+  // 素材の見出し1つだけを直す
+  if (form.id === "docedit" && form.dataset.sec) {
+    const path = form.dataset.path;
+    const k = Number(form.dataset.sec);
+    const body = form.querySelector("textarea").value;
+    button.disabled = true;
+    try {
+      await saveDoc(path, (text) => replaceSection(text, k, form.dataset.head, body), `${docName(path)} を更新`);
+      toast("保存しました");
+      ui.jump = k;
+      location.hash = `#/doc/${encodeURIComponent(path)}`;
+    } catch (e) {
+      toast(e.status ? explain(e) : e.message, true);
+      button.disabled = false;
+    }
+    return;
+  }
+
   if (form.id === "docedit") {
     const path = form.dataset.path;
     const text = form.querySelector("textarea").value;
@@ -261,7 +333,7 @@ document.addEventListener("submit", async (ev) => {
       state.docCache.set(path, { text, sha });
       store.set(DOC_KEY + path, JSON.stringify({ text, sha }));
       toast("保存しました");
-      location.hash = `#/doc/${encodeURIComponent(path)}`;
+      location.hash = path.startsWith(`${FINALS_DIR}/`) ? `#/docs/final/${encodeURIComponent(path.split("/").pop().replace(/\.md$/, ""))}` : `#/doc/${encodeURIComponent(path)}`;
     } catch (e) {
       if (e.status === 409) {
         state.docCache.delete(path);

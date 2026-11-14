@@ -1,8 +1,9 @@
 // 画面: 素材
 
 import { EPISODES_PATH, EXTRA_DOCS, STATE_RANK, TOPICS } from "../config.js";
-import { fmtDate } from "../dates.js";
-import { esc, inline, parseMarkdown, plain } from "../md.js";
+import { fmtDate, isoToday } from "../dates.js";
+import { countChars, finalFile, finalPath, finalPaths, finals, isFinal, parseFinal } from "../finals.js";
+import { esc, inline, parseMarkdown, plain, renderMarkdown } from "../md.js";
 import { bySlug, companyState, nextEvent } from "../model.js";
 import { avatar, ICONS, statePill } from "../parts.js";
 import { state } from "../store.js";
@@ -14,10 +15,9 @@ export function docName(path) {
   const company = path.startsWith("notes/") ? bySlug(base) : null;
   if (company) return company.name;
   if (base === "README") return "使い方";
+  if (isFinal(path)) return `確定版・${base}`;
   return base.replace(/^\d+_/, "").replace(/^_/, "");
 }
-
-const countChars = (s) => s.replace(/\s/g, "").length;
 
 // ESの文章のかけら
 // - profile/回答 などの土台: 見出しごと。ESにそのまま使える長さ（MIN_CHARS 以上）の段落を持つものだけ
@@ -86,13 +86,14 @@ function pieces(path, doc) {
 const noteCompany = (path) => (path.startsWith("notes/") ? bySlug(path.split("/").pop().replace(/\.md$/, "")) : null);
 const notePaths = () => state.docs?.find((g) => g.dir === "notes")?.paths || [];
 const docLink = (path) => `#/doc/${encodeURIComponent(path)}`;
+const finalLink = (file, q = "") => `#/docs/final/${encodeURIComponent(file)}${q ? `?${q}` : ""}`;
 const coRank = (path) => {
   const c = noteCompany(path);
   return c ? STATE_RANK[companyState(c)] : 99;
 };
 const loaded = (p) => (state.docCache.has(p) ? pieces(p, state.docCache.get(p)) : []);
 
-// すべての文章（土台＋各社）
+// すべての文章（以前の下書き＋各社のES）
 function allPieces() {
   return [...new Set(TOPICS.flatMap((t) => t.files))].flatMap(loaded).concat(notePaths().flatMap(loaded));
 }
@@ -103,7 +104,7 @@ export function companyPieces(slug) {
   return state.docCache.has(path) ? pieces(path, state.docCache.get(path)) : null;
 }
 
-// エピソード集の「## E1. 長期インターン」と、その中の【要記入】の数
+// エピソード集の「## E1. 長期インターン」と、その中身・【要記入】の数
 function episodes() {
   const doc = state.docCache.get(EPISODES_PATH);
   if (!doc) return [];
@@ -111,12 +112,16 @@ function episodes() {
   let on = false;
   for (const line of doc.text.split("\n")) {
     const m = line.match(/^## (E\d+)\.\s*(.*)$/);
-    if (m) list.push({ id: m[1], title: m[2], blanks: 0 });
-    else if (line.startsWith("#")) on = line.includes("要記入");
-    // 埋めた項目は打ち消し線（~~）で残しているので数えない
-    else if (on && list.length && /^\s*([-*]|\d+\.) (?!~~)/.test(line)) list[list.length - 1].blanks++;
+    if (m) list.push({ id: m[1], title: m[2], blanks: 0, lines: [] });
+    else if (/^## /.test(line)) list.push({ id: null, lines: [] });
+    else if (list.length) {
+      list[list.length - 1].lines.push(line);
+      if (line.startsWith("#")) on = line.includes("要記入");
+      // 埋めた項目は打ち消し線（~~）で残しているので数えない
+      else if (on && /^\s*([-*]|\d+\.) (?!~~)/.test(line)) list[list.length - 1].blanks++;
+    }
   }
-  return list.sort((a, b) => a.id.slice(1) - b.id.slice(1));
+  return list.filter((e) => e.id);
 }
 
 // 【要記入】の見出しの下にある、まだ埋まっていない箇条書きの数
@@ -130,43 +135,38 @@ function blanks(text) {
   return n;
 }
 
-// 文章がある字数（50字単位）
-const charRuler = (list) =>
-  `<span class="ruler" aria-label="ある字数">${[...new Set(list.map((x) => Math.max(50, Math.round(x.chars / 50) * 50)))]
-    .sort((a, b) => b - a)
-    .slice(0, 5)
-    .map((n) => `<b>${n}</b>`)
-    .join("")}</span>`;
-
 const loadingNote = () => (state.docsLoading ? "読み込み中…" : "");
 
-export function viewDocs() {
-  let html = `<header class="page-head"><h1 class="page-title">素材</h1><p class="page-sub">ESの文章を設問の種類ごとに集めています。土台の文章と、各社に出した文章を字数で比べて使い回せます。</p></header>`;
-  if (!state.docs) return html + `<p class="hint">読み込み中…</p>`;
-  const all = allPieces();
+// 確定版のテーマの札。版ごとの字数を並べる。まだ版がなければ「これから書く」
+function themeCard(t) {
+  return `<li><a class="theme${t.versions.length ? "" : " is-empty"}" href="${finalLink(t.file)}">
+    <span class="theme-name">${esc(t.name)}</span>
+    <span class="theme-kinds">${esc(t.kinds.join("・"))}</span>
+    <span class="theme-vers">${t.versions.length ? t.versions.map((v) => `<b>${v.chars}<small>字</small></b>`).join("") : '<span class="theme-none">これから書く</span>'}</span>
+  </a></li>`;
+}
 
-  html += `<h2 class="sec">設問から探す</h2><ul class="topics">${TOPICS.map((t) => {
-    const list = all.filter((x) => x.topic === t.key);
-    const base = list.filter((x) => x.state === "base").length;
-    const cos = list.length - base;
-    const count = list.length ? `${base ? `土台 <b>${base}</b>` : ""}${cos ? `<span>各社 <b>${cos}</b></span>` : ""}` : loadingNote() || "まだありません";
+export function viewDocs() {
+  let html = `<header class="page-head"><h1 class="page-title">素材</h1><p class="page-sub">ESに使う自分の文章。テーマごとに自分で書いた<b>確定版</b>を持ち、各社のESはそこから字数を合わせて作る。</p></header>`;
+  if (!state.docs) return html + `<p class="hint">読み込み中…</p>`;
+  const themes = finals();
+  const done = themes.filter((t) => t.versions.length).length;
+
+  html += `<h2 class="sec">確定版<span class="count">${done}/${themes.length}</span><button class="sec-link mini" data-newtheme>テーマを足す</button></h2>
+    <p class="sec-hint hint">テーマを開くと、確定版がいちばん上に、書くときの参考（エピソードの事実・過去のES）がその下に出ます。</p>
+    <ul class="themes">${themes.map(themeCard).join("") || `<li class="hint">${loadingNote() || "まだありません。"}</li>`}</ul>`;
+
+  // 設問の種類から: 確定版と、過去のES・下書き
+  const all = allPieces();
+  html += `<h2 class="sec">設問の種類から探す</h2><ul class="topics">${TOPICS.map((t) => {
+    const fin = themes.filter((x) => x.topics.includes(t.key) && x.versions.length).length;
+    const ref = all.filter((x) => x.topic === t.key).length;
     return `<li><a class="topic" href="#/docs/${t.key}">
       <span class="topic-name">${esc(t.name)}</span>
       <span class="topic-ask">${esc(t.ask)}</span>
-      <span class="topic-foot"><span class="topic-n">${count}</span>${list.length ? charRuler(list) : ""}</span>
+      <span class="topic-foot"><span class="topic-n">${fin ? `確定版 <b>${fin}</b>` : '<span class="faint">確定版なし</span>'}${ref ? `<span>参考 <b>${ref}</b></span>` : ""}</span></span>
     </a></li>`;
   }).join("")}</ul>`;
-
-  const eps = episodes();
-  if (eps.length) {
-    html += `<h2 class="sec">話から探す<a class="sec-link" href="${docLink(EPISODES_PATH)}">エピソード集を開く</a></h2><p class="sec-hint hint">事実はエピソード集が正。同じ話を使った文章を並べて、言っていることがずれていないか確かめる。</p>
-      <ul class="eps">${eps
-        .map((e) => {
-          const n = all.filter((x) => x.eps.includes(e.id)).length;
-          return `<li><a href="#/docs/${e.id}"><b class="ep-id">${e.id}</b><span class="ep-title">${esc(e.title)}</span><span class="ep-n">${n ? `文章 <b>${n}</b>` : ""}${e.blanks ? `<span>要記入 <b>${e.blanks}</b></span>` : ""}</span></a></li>`;
-        })
-        .join("")}</ul>`;
-  }
 
   // 企業ごと: 選考が進んでいる企業から。応募予定・選考中でノートがない企業には作るボタン
   const notes = notePaths()
@@ -194,35 +194,46 @@ export function viewDocs() {
       .join("")}</ul></details>`;
   }
 
-  // 土台と準備: 設問の土台にしていない profile/ のファイルと、そのほか
-  const used = new Set(TOPICS.map((t) => t.files[0]));
-  const profile = (state.docs.find((g) => g.dir === "profile")?.paths || []).filter((p) => !used.has(p)).sort((a, b) => a.split("/").length - b.split("/").length);
-  html += `<h2 class="sec">土台と準備</h2><ul class="doc-list">${[...profile, ...EXTRA_DOCS.map((d) => d.path)]
-    .map((p) => {
-      const doc = state.docCache.get(p);
-      const n = doc ? blanks(doc.text) : 0;
-      return `<li><a href="${docLink(p)}"><span class="doc-icon" aria-hidden="true"></span><span class="doc-name">${esc(docName(p))}${p.includes("/保管/") ? '<small class="faint">（保管）</small>' : ""}</span>${n ? `<span class="blank-n" title="【要記入】の項目">要記入 <b>${n}</b></span>` : ""}</a></li>`;
-    })
-    .join("")}</ul>`;
+  // そのほか: 事実の元帳・面接・ルール、以前の下書き（AI）
+  const profile = (state.docs.find((g) => g.dir === "profile")?.paths || []).filter((p) => !isFinal(p));
+  const drafts = profile.filter((p) => p.includes("/回答/"));
+  const rest = profile.filter((p) => !drafts.includes(p)).sort((a, b) => (a === EPISODES_PATH ? -1 : b === EPISODES_PATH ? 1 : a.split("/").length - b.split("/").length));
+  const row = (p) => {
+    const doc = state.docCache.get(p);
+    const n = doc ? blanks(doc.text) : 0;
+    return `<li><a href="${docLink(p)}"><span class="doc-icon" aria-hidden="true"></span><span class="doc-name">${esc(p === EPISODES_PATH ? "エピソード集（事実の元帳）" : docName(p))}${p.includes("/保管/") ? '<small class="faint">（保管）</small>' : ""}</span>${n ? `<span class="blank-n" title="【要記入】の項目">要記入 <b>${n}</b></span>` : ""}</a></li>`;
+  };
+  html += `<h2 class="sec">事実と準備</h2><ul class="doc-list">${[...rest, ...EXTRA_DOCS.map((d) => d.path)].map(row).join("")}</ul>
+    <details class="note-missing"><summary>以前の下書き（AIが書いた文）<span class="count">${drafts.length}</span></summary><ul class="doc-list">${drafts.map(row).join("")}</ul></details>`;
   return html;
 }
 
 function pieceItem(x) {
   const c = noteCompany(x.path);
-  const src = c ? `${avatar(c, "sm")}<a href="${docLink(x.path)}">${esc(c.name)}</a>` : `<a class="base-src" href="${docLink(x.path)}">土台・${esc(docName(x.path))}</a>`;
+  const src = c ? `${avatar(c, "sm")}<a href="${docLink(x.path)}">${esc(c.name)}</a>` : `<a class="base-src" href="${docLink(x.path)}">以前の下書き・${esc(docName(x.path))}</a>`;
   const preview = x.text.replace(/\s+/g, " ").slice(0, 80);
   const sub = [x.route && esc(x.route), x.date && esc(fmtDate(x.date))].filter(Boolean).join(" ");
   return `<li class="piece is-${x.state}${x.mine ? " is-mine" : ""}">
-    <div class="piece-top"><span class="piece-src">${src}${x.mine ? '<span class="mine">本人</span>' : ""}${STATE_MARK[x.state]}${sub ? `<small>${sub}</small>` : ""}</span>
+    <div class="piece-top"><span class="piece-src">${src}${x.mine ? '<span class="mine">本人</span>' : '<span class="tag ai" title="AIが書いた文。内容（事実）の確認に使う">AI</span>'}${STATE_MARK[x.state]}${sub ? `<small>${sub}</small>` : ""}</span>
       <span class="chars">${x.chars}字${x.limit ? `<small>／${esc(x.limit)}</small>` : ""}</span><button class="mini" data-copy="${esc(x.text)}">コピー</button></div>
     <details><summary><b class="piece-title">${esc(x.title)}</b><span class="piece-pre">${esc(preview)}</span></summary><div class="md">${x.html}</div></details>
-    ${x.eps.length ? `<p class="piece-eps">${x.eps.map((e) => `<a href="#/docs/${esc(e)}">${esc(e)}</a>`).join("")}</p>` : ""}
+    ${x.eps.length ? `<p class="piece-eps">${x.eps.map((e) => `<span>${esc(e)}</span>`).join("")}</p>` : ""}
   </li>`;
 }
 
-// 並び: 本人が書いたもの → 提出したもの → 土台 → 下書き → 以前の版。同じなら選考が進んでいる企業から
+// 並び: 本人が書いたもの → 提出したもの → 以前の下書き → 下書き → 以前の版。同じなら選考が進んでいる企業から
 const ORDER = { sent: 0, final: 0, base: 1, draft: 2, old: 3 };
 const byUse = (a, b) => b.mine - a.mine || ORDER[a.state] - ORDER[b.state] || coRank(a.path) - coRank(b.path);
+
+// 確定版の1つの版。本文はたたまずに出す
+function versionItem(t, v, { edit = true } = {}) {
+  return `<article class="version">
+    <div class="version-top"><h3>${esc(v.head)}</h3><span class="chars">${v.chars}字</span>
+      <button class="mini primary" data-copy="${esc(v.text)}">コピー</button>${edit ? `<a class="mini" href="${finalLink(t.file, `edit=${encodeURIComponent(v.head)}`)}">直す</a>` : ""}</div>
+    <div class="version-body">${renderMarkdown(v.body)}</div>
+    ${v.memo ? `<p class="version-memo">${esc(v.memo)}</p>` : ""}
+  </article>`;
+}
 
 const LENGTHS = [100, 200, 300, 400, 500];
 
@@ -230,47 +241,131 @@ export function viewTopic(key, query) {
   const t = TOPICS.find((x) => x.key === key);
   if (!t) return `<a class="back" href="#/docs">素材</a><p class="error">見つかりません。</p>`;
   const len = Number(query.get("len")) || 0;
-  const ep = query.get("ep") || "";
   const mine = query.get("by") === "me";
+  const themes = finals().filter((x) => x.topics.includes(key));
   const pool = allPieces().filter((x) => x.topic === key);
-  const eps = [...new Set(pool.flatMap((x) => x.eps))].sort((a, b) => a.slice(1) - b.slice(1));
-  let list = pool.filter((x) => (!ep || x.eps.includes(ep)) && (!mine || x.mine));
+  let list = pool.filter((x) => !mine || x.mine);
   // 字数を選ぶと、近い順に1列で並べる（多少長さが違っても、近いものから直して使う）
   list = len ? list.sort((a, b) => Math.abs(a.chars - len) - Math.abs(b.chars - len)) : list.sort(byUse);
-  const link = (l, e, m = mine) => {
+  const link = (l, m = mine) => {
     const q = new URLSearchParams();
     if (l) q.set("len", l);
-    if (e) q.set("ep", e);
     if (m) q.set("by", "me");
     return `#/docs/${key}${q.toString() ? `?${q}` : ""}`;
   };
-  const eplist = episodes();
-  const chip = (href, on, label, title = "") => `<a class="chip" href="${href}"${on ? ' aria-current="true"' : ""}${title ? ` title="${esc(title)}"` : ""}>${label}</a>`;
+  const chip = (href, on, label) => `<a class="chip" href="${href}"${on ? ' aria-current="true"' : ""}>${label}</a>`;
   return `<a class="back" href="#/docs">素材</a>
-    <header class="page-head"><h1 class="page-title">${esc(t.name)}<span class="count">${pool.length}</span></h1><p class="page-sub">${esc(t.ask)}</p></header>
+    <header class="page-head"><h1 class="page-title">${esc(t.name)}</h1><p class="page-sub">${esc(t.ask)}</p></header>
     <nav class="topic-tabs" aria-label="設問の種類">${TOPICS.map((x) => `<a href="#/docs/${x.key}"${x.key === key ? ' aria-current="page"' : ""}>${esc(x.name)}</a>`).join("")}</nav>
+    <h2 class="sec">確定版</h2>
+    ${themes.length
+      ? themes.map((th) => `<section class="theme-block"><h3 class="theme-block-head"><a href="${finalLink(th.file)}">${esc(th.name)}</a></h3>${th.versions.length ? th.versions.map((v) => versionItem(th, v, { edit: false })).join("") : `<p class="hint">まだ書いていません。<a href="${finalLink(th.file, "new=1")}">書く</a></p>`}</section>`).join("")
+      : `<p class="hint">${loadingNote() || "この種類のテーマはまだありません。"}</p>`}
+    <h2 class="sec">参考: 過去のESと下書き<span class="count">${pool.length}</span></h2>
+    <p class="sec-hint hint">「本人」の印がないものは AI が書いた文。内容（事実）の確認に使い、文章は確定版に書く。</p>
     <div class="filters">
-      <div class="chips" aria-label="字数"><span class="chips-label">字数</span>${chip(link(0, ep), !len, "すべて")}${LENGTHS.map((n) => chip(link(n, ep), len === n, `${n}字`)).join("")}</div>
-      <div class="chips" aria-label="書いた人"><span class="chips-label">書き手</span>${chip(link(len, ep, false), !mine, "すべて")}${chip(link(len, ep, true), mine, "本人の文章（正典）")}</div>
-      ${eps.length ? `<div class="chips" aria-label="話"><span class="chips-label">話</span>${chip(link(len, ""), !ep, "すべて")}${eps.map((e) => chip(link(len, e), ep === e, e, eplist.find((x) => x.id === e)?.title)).join("")}</div>` : ""}
+      <div class="chips" aria-label="字数"><span class="chips-label">字数</span>${chip(link(0), !len, "すべて")}${LENGTHS.map((n) => chip(link(n), len === n, `${n}字`)).join("")}</div>
+      <div class="chips" aria-label="書いた人"><span class="chips-label">書き手</span>${chip(link(len, false), !mine, "すべて")}${chip(link(len, true), mine, "本人")}</div>
     </div>
-    ${len ? `<p class="sec-hint hint">${len}字に近い順。長いものは削り、短いものは足して使う。</p>` : `<p class="sec-hint hint">本人の文章 → 提出したもの → 土台 → 下書きの順。${t.files.map((p) => `<a href="${docLink(p)}">${esc(docName(p))}</a>`).join("・")}</p>`}
+    ${len ? `<p class="sec-hint hint">${len}字に近い順。</p>` : ""}
     <ul class="pieces">${list.map(pieceItem).join("") || `<li class="hint">${loadingNote() || "まだありません。"}</li>`}</ul>`;
 }
 
-export function viewEpisode(id) {
-  const e = episodes().find((x) => x.id === id);
-  const list = allPieces().filter((x) => x.eps.includes(id)).sort(byUse);
+// テーマの参考にする文章: 種類が合っていて、テーマに話があるなら同じ話を使ったもの
+// （E1 を使っていても志望動機のESはインターンのテーマには出さない）
+function themeRefs(t) {
+  return allPieces()
+    .filter((x) => t.topics.includes(x.topic) && (!t.eps.length || x.eps.some((e) => t.eps.includes(e))))
+    .sort(byUse);
+}
+
+function finalForm(t, v, isNew) {
+  const head = v?.head || "";
+  return `<form id="finalform" class="final-form" data-path="${esc(t.path)}" data-file="${esc(t.file)}" data-old="${esc(head)}">
+    <h3>${isNew ? "新しい版を書く" : `${esc(head)} を直す`}</h3>
+    <label>見出し（字数が分かる名前に）<input name="head" value="${esc(head)}" placeholder="400字版" required></label>
+    <label>本文<textarea name="body" class="final-text" rows="12" required>${esc(v?.body || "")}</textarea></label>
+    <p class="final-count" id="final-count" aria-live="polite"></p>
+    <label>メモ（いつ・どのESで確定したか など）<input name="memo" value="${esc(v ? v.memo : `${isoToday()} 確定`)}"></label>
+    <div class="final-actions"><button class="btn primary" type="submit">保存する</button><a class="btn" href="${finalLink(t.file)}">やめる</a>
+      ${isNew ? "" : '<button class="btn danger" type="button" data-delversion>この版を消す</button>'}</div>
+  </form>`;
+}
+
+export function viewFinal(file, query) {
+  const path = finalPath(file);
+  const doc = state.docCache.get(path);
+  if (!doc) return `<a class="back" href="#/docs">素材</a><p class="hint">${state.docs && !finalPaths().includes(path) ? "見つかりません。" : "読み込み中…"}</p>`;
+  const t = parseFinal(path, doc);
+  const editing = query.get("edit");
+  const isNew = query.has("new");
+  const target = editing && t.versions.find((v) => v.head === editing);
+  const eps = episodes();
+  const refs = themeRefs(t);
+  const sent = refs.filter((x) => !x.path.startsWith("profile/"));
+  const drafts = refs.filter((x) => x.path.startsWith("profile/"));
   let html = `<a class="back" href="#/docs">素材</a>
-    <header class="page-head"><h1 class="page-title"><span class="ep-id">${esc(id)}</span>${esc(e?.title || "")}</h1>
-    <p class="page-sub">この話を使った文章。数字や期間が食い違っていないか、ここで見比べる。${e?.blanks ? `　要記入 <b>${e.blanks}</b>` : ""}</p></header>
-    <a class="btn ghost wide" href="${docLink(EPISODES_PATH)}">エピソード集で事実を見る</a>`;
-  for (const t of TOPICS) {
-    const sub = list.filter((x) => x.topic === t.key);
-    if (sub.length) html += `<h2 class="sec">${esc(t.name)}<span class="count">${sub.length}</span></h2><ul class="pieces">${sub.map(pieceItem).join("")}</ul>`;
+    <header class="page-head"><h1 class="page-title">${esc(t.name)}</h1>${t.desc ? `<p class="page-sub">${inline(t.desc)}</p>` : ""}
+      <p class="theme-meta">${t.kinds.map((k) => {
+        const tp = TOPICS.find((x) => x.name === k);
+        return tp ? `<a class="chip" href="#/docs/${tp.key}">${esc(k)}</a>` : "";
+      }).join("")}${t.eps.map((e) => `<span class="ep-id" title="${esc(eps.find((x) => x.id === e)?.title || "")}">${esc(e)}</span>`).join("")}
+      <a class="theme-file" href="${docLink(path)}/edit">話・種類・説明を直す</a></p></header>
+    <div class="theme-layout"><div class="theme-main"><h2 class="sec">確定版<span class="count">${t.versions.length}</span>${isNew || target ? "" : `<a class="sec-link" href="${finalLink(t.file, "new=1")}">新しい版を書く</a>`}</h2>`;
+  if (isNew) html += finalForm(t, null, true);
+  html += t.versions.map((v) => (v === target ? finalForm(t, v, false) : versionItem(t, v))).join("");
+  if (!t.versions.length && !isNew) {
+    html += `<div class="final-empty"><p><b>まだ確定版がありません。</b></p><p class="hint">参考でエピソードの事実と過去の文章を確かめてから、自分の言葉で書いてください。</p><a class="btn primary" href="${finalLink(t.file, "new=1")}">書く</a></div>`;
   }
-  if (!list.length) html += `<p class="hint">${loadingNote() || "この話を使った文章はまだありません。"}</p>`;
+
+  html += `</div><aside class="theme-refs"><h2 class="sec">書くときの参考</h2><p class="sec-hint hint">事実はエピソード集が正。「本人」の印がない文章は AI が書いたもの（言葉は借りず、事実の確認に使う）。</p>`;
+  for (const id of t.eps) {
+    const e = eps.find((x) => x.id === id);
+    if (e) html += `<details class="ref"><summary><span class="ep-id">${esc(id)}</span>${esc(e.title)} の事実${e.blanks ? `<small>要記入 ${e.blanks}</small>` : ""}</summary><div class="md">${renderMarkdown(e.lines.join("\n"), { dir: "profile" })}</div></details>`;
+  }
+  html += `<details class="ref"${t.versions.length ? "" : " open"}><summary>各社に出したES<span class="count">${sent.length}</span></summary><ul class="pieces">${sent.map(pieceItem).join("") || `<li class="hint">${loadingNote() || "ありません。"}</li>`}</ul></details>
+    <details class="ref"><summary>以前の下書き（AI）<span class="count">${drafts.length}</span></summary><ul class="pieces">${drafts.map(pieceItem).join("") || `<li class="hint">${loadingNote() || "ありません。"}</li>`}</ul></details></aside></div>`;
   return html;
+}
+
+// 版の本文の字数。見出しに「400字」とあれば、それと比べる
+export function bindFinalCounter() {
+  const form = document.getElementById("finalform");
+  if (!form) return;
+  const out = document.getElementById("final-count");
+  const update = () => {
+    const n = countChars(form.body.value);
+    const limit = Number(form.head.value.match(/(\d+)字/)?.[1]) || 0;
+    out.innerHTML = `<b>${n}</b>字${limit ? `<span>／${limit}字${n > limit ? `<em>（${n - limit}字オーバー）</em>` : `（あと${limit - n}字）`}</span>` : ""}`;
+  };
+  form.addEventListener("input", update);
+  update();
+  requestAnimationFrame(() => {
+    form.scrollIntoView({ block: "start" });
+    form.body.focus({ preventScroll: true });
+  });
+}
+
+// 素材の見出しごとの区切り（行の範囲）。コードの中の # は見出しにしない
+export function rawSections(text) {
+  const lines = text.split("\n");
+  const starts = [];
+  let code = false;
+  lines.forEach((l, i) => {
+    if (l.trim().startsWith("```")) code = !code;
+    else if (!code && /^#{2,6}\s/.test(l)) starts.push(i);
+  });
+  return starts.map((s, k) => ({ head: lines[s], from: s, to: k + 1 < starts.length ? starts[k + 1] : lines.length }));
+}
+
+// k 番目の見出しの節を差し替える。見出しの文が変わっていたら同じ見出しを探す
+export function replaceSection(text, k, head, body) {
+  const secs = rawSections(text);
+  const s = secs[k]?.head === head ? secs[k] : secs.find((x) => x.head === head);
+  if (!s) throw new Error("直している見出しが見つかりません（別の端末で変わったかもしれません）");
+  const lines = text.split("\n");
+  lines.splice(s.from, s.to - s.from, ...body.replace(/\s+$/, "").split("\n"), "");
+  return lines.join("\n");
 }
 
 export function viewDoc(path, doc) {
@@ -292,41 +387,48 @@ export function viewDoc(path, doc) {
     : "";
   const c = noteCompany(path);
   let html = `
-    <a class="back" href="#/docs">素材</a>
+    ${isFinal(path) ? `<a class="back" href="#/docs/final/${encodeURIComponent(finalFile(path))}">${esc(parseFinal(path, doc).name)}</a>` : '<a class="back" href="#/docs">素材</a>'}
     ${c ? `<a class="doc-co" href="#/c/${esc(c.slug)}">${avatar(c)}<span class="doc-co-name">${esc(c.name)}</span>${statePill(companyState(c))}<span class="doc-co-go">企業ページ</span></a>` : ""}
     <div class="doc-head"><span class="doc-path">${esc(path)}${doc.offline ? "（端末の控え）" : ""}</span><a class="icon-btn" href="#/doc/${encodeURIComponent(path)}/edit" aria-label="編集">${ICONS.edit}</a></div>
     <div class="doc-layout${toc ? " has-toc" : ""}">
     ${toc}
     <article class="md">`;
-  for (const s of sections) {
+  sections.forEach((s, i) => {
     const text = s.blocks.filter((b) => b.type === "p" || b.type === "code").map((b) => (b.type === "p" ? plain(b.text) : b.text)).join("\n");
     if (s.head) {
       const title = s.head.text.replace(/（\d+字）$/, "");
       const lv = s.head.level + 1;
-      const id = heads.includes(s) ? ` id="h-${heads.indexOf(s)}"` : "";
+      const id = ` id="${heads.includes(s) ? `h-${heads.indexOf(s)}` : `s-${i - 1}`}" data-sec="${i - 1}"`;
+      // 見出しごとに、その節だけを直せる
+      const fix = `<a class="mini sec-fix" href="#/doc/${encodeURIComponent(path)}/edit?sec=${i - 1}">直す</a>`;
       // 文字数とコピーは、ESにそのまま使う長さの文章がある見出しと、情報の行があるESの設問に出す
       const isAnswer = s.blocks.some((b) => b.type === "meta") && countChars(text) > 0;
       if (countChars(text) >= MIN_CHARS || isAnswer) {
         html += `<div class="sec-head"${id}><h${lv}>${inline(title, { dir })}</h${lv}>
           <span class="chars">${countChars(text)}字</span>
-          <button class="mini" data-copy="${esc(text)}">コピー</button></div>`;
+          <button class="mini" data-copy="${esc(text)}">コピー</button>${fix}</div>`;
       } else {
-        html += `<h${lv}${id}>${inline(title, { dir })}</h${lv}>`;
+        html += `<div class="sec-head plain"${id}><h${lv}>${inline(title, { dir })}</h${lv}>${fix}</div>`;
       }
     }
     html += s.blocks.map((b) => b.html).join("");
-  }
+  });
   return html + `</article></div>`;
 }
 
-export function viewDocEdit(path, doc) {
+export function viewDocEdit(path, doc, query) {
+  // ?sec=k なら、k 番目の見出しの節だけを直す
+  const k = query?.has("sec") ? Number(query.get("sec")) : -1;
+  const sec = k >= 0 ? rawSections(doc.text)[k] : null;
+  const back = isFinal(path) && !sec ? `#/docs/final/${encodeURIComponent(finalFile(path))}` : `#/doc/${encodeURIComponent(path)}`;
+  const text = sec ? doc.text.split("\n").slice(sec.from, sec.to).join("\n").replace(/\s+$/, "") : doc.text;
   return `
-    <a class="back" href="#/doc/${encodeURIComponent(path)}">${esc(docName(path))}</a>
-    <form id="docedit" data-path="${esc(path)}">
-      <div class="doc-head"><span class="doc-path">${esc(path)}</span><span class="chars" id="doc-count"></span></div>
-      <textarea name="text" class="doc-text" spellcheck="false">${esc(doc.text)}</textarea>
+    <a class="back" href="${back}">${esc(docName(path))}</a>
+    <form id="docedit" data-path="${esc(path)}"${sec ? ` data-sec="${k}" data-head="${esc(sec.head)}"` : ""}>
+      <div class="doc-head"><span class="doc-path">${sec ? `<b>${esc(sec.head.replace(/^#+\s*/, ""))}</b> だけを直す・<a href="#/doc/${encodeURIComponent(path)}/edit">ファイル全体を直す</a>` : esc(path)}</span><span class="chars" id="doc-count"></span></div>
+      <textarea name="text" class="doc-text${sec ? " is-section" : ""}" spellcheck="false">${esc(text)}</textarea>
       <p class="hint">文字を選択すると、選択した部分の文字数（空白・改行を除く）が上に出ます。</p>
-      <button class="btn primary wide" type="submit">保存する</button>
+      <div class="final-actions"><button class="btn primary" type="submit">保存する</button><a class="btn" href="${back}">やめる</a></div>
     </form>`;
 }
 

@@ -1,10 +1,10 @@
 // アプリの画面だけを端末に残し、電波がなくても開けるようにする。
 // GitHub API（データ）は扱わない。データの控えは js/data.js が端末内に持つ。
-const CACHE = "shukatsu-board-v12";
+const CACHE = "shukatsu-board-v13";
 const SHELL = [
   "./", "index.html", "icon.svg", "manifest.webmanifest",
   ...["base", "parts", "home", "calendar", "companies", "company", "edit", "docs", "search", "settings"].map((n) => `css/${n}.css`),
-  ...["main", "events", "actions", "render", "data", "github", "store", "config", "dates", "model", "parts", "ics", "toast", "md"].map((n) => `js/${n}.js`),
+  ...["main", "events", "actions", "render", "data", "github", "store", "config", "dates", "model", "parts", "ics", "toast", "md", "finals"].map((n) => `js/${n}.js`),
   ...["home", "calendar", "companies", "company", "edit", "docs", "search", "settings"].map((n) => `js/views/${n}.js`),
 ];
 const FONT_HOSTS = ["fonts.googleapis.com", "fonts.gstatic.com"];

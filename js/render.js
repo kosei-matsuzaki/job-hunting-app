@@ -9,7 +9,7 @@ import { cfg, state, store, ui } from "./store.js";
 import { viewCalendar } from "./views/calendar.js";
 import { companyPool, companyRows, currentTab, searching, viewCompanies } from "./views/companies.js";
 import { viewCompany } from "./views/company.js";
-import { bindDocCounter, viewDoc, viewDocEdit, viewDocs, viewEpisode, viewTopic } from "./views/docs.js";
+import { bindDocCounter, bindFinalCounter, viewDoc, viewDocEdit, viewDocs, viewFinal, viewTopic } from "./views/docs.js";
 import { viewAddEvent, viewEdit } from "./views/edit.js";
 import { viewHome } from "./views/home.js";
 import { loadSearchDocs, searchResults, viewSearch } from "./views/search.js";
@@ -27,7 +27,7 @@ export function renderChrome() {
   const tab = { c: "companies", new: "companies", doc: "docs", add: "calendar", schedule: "home" }[name] || name;
   document.querySelectorAll(".tabs a").forEach((a) => a.toggleAttribute("aria-current", a.dataset.tab === tab));
   // 画面ごとに幅を変える（フォームや文章は読みやすい幅、一覧やダッシュボードは広く）
-  $view().dataset.view = sub === "edit" ? "form" : { new: "form", add: "form", settings: "form", search: "form" }[name] || name || "home";
+  $view().dataset.view = sub === "edit" && name !== "docs" ? "form" : { new: "form", add: "form", settings: "form", search: "form" }[name] || name || "home";
   document.getElementById("reload").classList.toggle("spinning", state.loading);
   document.body.classList.toggle("signed-out", !cfg.token);
 }
@@ -57,14 +57,14 @@ export async function render() {
     else if (name === "c" && arg) html = viewCompany(arg, sub);
     else if (name === "new") html = viewEdit(null);
     else if (name === "add") html = viewAddEvent(arg, query.get("c"));
-    else if (name === "docs") html = !arg ? viewDocs() : /^E\d+$/.test(arg) ? viewEpisode(arg) : viewTopic(arg, query);
+    else if (name === "docs") html = !arg ? viewDocs() : arg === "final" ? viewFinal(sub, query) : viewTopic(arg, query);
     else if (name === "search") html = viewSearch();
     else if (name === "settings") html = viewSettings();
     else if (name === "doc") {
       view.innerHTML = `<p class="hint loading">読み込み中…</p>`;
       const doc = await getDoc(arg);
       if (route().parts[1] !== arg) return; // 読み込み中に別の画面へ移動した
-      html = sub === "edit" ? viewDocEdit(arg, doc) : viewDoc(arg, doc);
+      html = sub === "edit" ? viewDocEdit(arg, doc, query) : viewDoc(arg, doc);
     } else html = viewHome();
   } catch (e) {
     html = `<p class="error">${esc(e.status ? explain(e) : `表示できませんでした（${e.message}）`)}</p>`;
@@ -87,6 +87,12 @@ function afterRender(name, sub, arg) {
   }
   if (name === "docs") loadAllDocs().then((loaded) => loaded && route().parts[0] === "docs" && render());
   if (name === "doc" && sub === "edit") bindDocCounter();
+  if (name === "docs" && arg === "final") bindFinalCounter();
+  // 節だけを直したあとは、その見出しに戻る
+  if (name === "doc" && sub !== "edit" && ui.jump != null) {
+    document.querySelector(`[data-sec="${ui.jump}"]`)?.scrollIntoView({ block: "start" });
+    ui.jump = null;
+  }
   if (name === "search") {
     const box = document.getElementById("q");
     box.addEventListener("input", () => {

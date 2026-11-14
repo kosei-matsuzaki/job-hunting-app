@@ -1,4 +1,59 @@
-/* 素材: 設問ごとの索引・企業ごとのノート・土台、本文（Markdown）、ESの文字数とコピー、編集欄 */
+/* 素材: 確定版のテーマ・設問ごとの索引・企業ごとのノート、本文（Markdown）、ESの文字数とコピー、編集欄 */
+
+/* 確定版のテーマ: 手帳の見出し札。書いた版の字数を並べ、まだのものは点線の札 */
+.themes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0 0; padding: 0; list-style: none; }
+.theme {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  height: 100%;
+  padding: 10px 12px 9px;
+  border: 1px solid var(--ink);
+  border-left: 5px solid var(--ink);
+  border-radius: 2px 8px 8px 2px;
+  background: var(--sheet);
+  color: var(--ink);
+  text-decoration: none;
+}
+.theme:hover { background: var(--sheet-2); }
+.theme.is-empty { border: 1px dashed var(--faint); border-left: 5px solid var(--rule); background: transparent; }
+.theme-name { font-size: 1.0625rem; font-weight: 900; letter-spacing: 0.02em; }
+.theme-kinds { flex: 1; color: var(--muted); font-size: 0.75rem; }
+.theme-vers { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.theme-vers b { padding: 0 6px; border-radius: 3px; background: var(--ink); color: var(--paper); font-family: var(--num); font-size: 0.9375rem; font-weight: 600; line-height: 1.4; }
+.theme-vers small { margin-left: 1px; font-family: var(--font); font-size: 0.625rem; font-weight: 500; }
+.theme-none { color: var(--faint); font-size: 0.75rem; }
+
+/* テーマのページ */
+.theme-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 0; }
+.theme-meta .ep-id { padding: 3px 8px; }
+.theme-file { margin-left: auto; font-size: 0.8125rem; }
+.version { margin: 12px 0 0; padding: 12px 14px 4px; border: 1px solid var(--rule); border-left: 4px solid var(--ink); border-radius: 2px 8px 8px 2px; background: var(--sheet); }
+.version-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.version-top h3 { flex: 1; margin: 0; font-size: 1rem; }
+.version-body p { margin: 0 0 10px; line-height: 1.85; }
+.version-memo { margin: 0 0 8px; color: var(--muted); font-size: 0.75rem; }
+.theme-block { margin: 10px 0 18px; }
+.theme-block-head { margin: 0; font-size: 0.9375rem; }
+.theme-block-head a { color: var(--ink); }
+.final-empty { margin: 12px 0; padding: 16px; border: 1px dashed var(--faint); border-radius: 8px; text-align: center; }
+.final-empty p { margin: 0 0 6px; }
+.final-form { margin: 12px 0 0; padding: 4px 14px 14px; border: 2px solid var(--ink); border-radius: 8px; background: var(--sheet); scroll-margin-top: 64px; }
+.final-form h3 { margin: 10px 0 0; font-size: 1rem; }
+.final-text { min-height: 16em; font-size: 0.9375rem; line-height: 1.85; }
+.final-count { margin: -6px 0 0; color: var(--muted); font-size: 0.8125rem; text-align: right; }
+.final-count b { color: var(--ink); font-family: var(--num); font-size: 1.25rem; font-weight: 600; }
+.final-count em { color: var(--ink); font-style: normal; font-weight: 700; }
+.final-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.final-actions .danger { margin-left: auto; }
+.ref { margin: 8px 0 0; border-bottom: 1px solid var(--rule); }
+.ref > summary { display: flex; align-items: center; gap: 8px; padding: 10px 0; font-weight: 700; cursor: pointer; }
+.ref > summary small { color: var(--muted); font-size: 0.75rem; font-weight: 500; }
+.ref > .md { padding: 0 0 8px 12px; border-left: 2px solid var(--rule); font-size: 0.9375rem; }
+.tag.ai { background: none; border: 1px solid var(--ai); color: var(--ai); }
+.sec-fix { min-height: 28px; padding: 0 9px; border-style: dashed; color: var(--muted); font-size: 0.75rem; }
+.sec-head.plain:has(h4, h5, h6) { border-bottom: 0; padding-bottom: 0; margin: 22px 0 6px; }
+.doc-text.is-section { min-height: 45vh; }
 
 /* 設問の索引: 手帳の見出し札。下に土台の版の字数を目盛りのように並べる */
 .topics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0 0; padding: 0; list-style: none; }
@@ -21,9 +76,6 @@
 .topic-n { color: var(--muted); font-size: 0.75rem; white-space: nowrap; }
 .topic-n > span { margin-left: 8px; }
 .topic-n b, .note-meta b { color: var(--ink); font-family: var(--num); font-size: 1rem; font-weight: 600; }
-.ruler { display: inline-flex; }
-.ruler b { padding: 0 5px; border-left: 1px solid var(--faint); font-family: var(--num); font-size: 0.875rem; font-weight: 500; line-height: 1.1; color: var(--muted); }
-.ruler b:first-child { border-left: 0; padding-left: 0; }
 
 /* 企業ごとのノート */
 .notes { margin: 0; padding: 0; list-style: none; }
@@ -114,7 +166,7 @@
 /* 本人が書いた文章（正典）は墨の線で目立たせる */
 .piece.is-mine { border-left: 3px solid var(--ink); padding-left: 10px; }
 .piece-eps { display: flex; gap: 4px; margin: 6px 0 0; }
-.piece-eps a, .ep-id {
+.piece-eps span, .ep-id {
   padding: 0 6px;
   border-radius: 3px;
   background: var(--sheet-2);
@@ -144,14 +196,6 @@
 }
 .chip[aria-current] { border-color: var(--ink); background: var(--ink); color: var(--paper); font-weight: 600; }
 
-/* 話（エピソード）の一覧 */
-.eps { margin: 6px 0 0; padding: 0; list-style: none; }
-.eps a { display: flex; align-items: baseline; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--rule); color: var(--ink); text-decoration: none; }
-.eps a:hover .ep-title { text-decoration: underline; text-underline-offset: 3px; }
-.eps .ep-id { flex: none; min-width: 2.6em; text-align: center; color: var(--ink); }
-.ep-title { flex: 1; min-width: 0; }
-.ep-n { display: flex; gap: 10px; color: var(--muted); font-size: 0.75rem; white-space: nowrap; }
-.ep-n b { color: var(--ink); font-family: var(--num); font-size: 1rem; font-weight: 600; }
 .page-title .ep-id { margin-right: 10px; padding: 0 8px; font-size: 1.25rem; color: var(--ink); vertical-align: 3px; }
 
 /* 企業ノートの上に出す企業 */
@@ -271,7 +315,8 @@
 
 @media (min-width: 760px) {
   .doc-list { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); column-gap: 24px; }
-  .topics { grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .topics, .themes { grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .version, .final-form, .theme-block, .ref { max-width: 860px; }
   .topic-tabs { margin: 0 0 4px; padding: 0; }
 
   .toc { flex-wrap: wrap; overflow: visible; margin: 6px 0 4px; padding: 4px 0 8px; }
@@ -279,7 +324,6 @@
 
 @media (min-width: 1024px) {
   .notes { display: grid; grid-template-columns: 1fr 1fr; column-gap: 28px; }
-  .eps { display: grid; grid-template-columns: 1fr 1fr; column-gap: 28px; }
   .pieces { max-width: 860px; }
   /* 素材: 目次を左に固定 */
   .doc-layout.has-toc { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 36px; align-items: start; }
@@ -299,4 +343,11 @@
   .doc-layout .toc button:hover { margin-left: -2px; border-left: 2px solid var(--ink); }
   .doc-layout .toc button.sub { padding-left: 24px; }
   .doc-layout .md, main[data-view="doc"] .md { max-width: 820px; }
+}
+
+/* テーマのページ: 広い画面では、確定版（書く欄）の横に参考を並べる */
+@media (min-width: 1180px) {
+  .theme-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr); gap: 32px; align-items: start; }
+  .theme-refs { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; }
+  .theme-layout .version, .theme-layout .final-form, .theme-layout .ref { max-width: none; }
 }
