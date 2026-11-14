@@ -81,6 +81,7 @@
     white-space: nowrap;
   }
   .cal-ev.event { border-left-color: var(--ai); background: var(--ai-soft); }
+  .cal-ev.result { border-left: 3px double var(--ink); background: var(--sheet-2); }
   .cal-ev.done { border-left-color: var(--faint); background: var(--sheet-2); color: var(--faint); text-decoration: line-through; }
   .cal-evs b { padding-left: 6px; color: var(--muted); font-size: 0.625rem; }
 }

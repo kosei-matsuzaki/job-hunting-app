@@ -1,6 +1,6 @@
 // 画面の操作を受け取る
 
-import { addRecord, addTodo, finishTodo, markDone, saveMypage, statusClick, undoable } from "./actions.js";
+import { addRecord, addTodo, finishTodo, markDone, saveMypage, setResultDate, statusClick, undoable } from "./actions.js";
 import { DEFAULT_FLOW, FINALS_DIR, PRIORITY_LABEL } from "./config.js";
 import { addDocPath, commit, DOC_KEY, idle, loadCompanies, loadDocList, newId, normalize, saveDoc } from "./data.js";
 import { daysUntil, isoToday } from "./dates.js";
@@ -246,6 +246,11 @@ async function onSubmit(form) {
     const get = (k) => String(fd.get(k) ?? "").trim();
     return saveMypage(form.dataset.mypage, { url: get("url"), id: get("id"), password: get("password") });
   }
+  if (form.dataset.result) {
+    const [slug, pid] = form.dataset.result.split(":");
+    button.disabled = true;
+    return setResultDate(slug, pid, form.date.value);
+  }
   if (form.dataset.todo || form.dataset.record) {
     const text = form.text.value.trim();
     if (!text) return;
@@ -401,7 +406,13 @@ window.addEventListener("hashchange", () => {
     history.pushState(null, "", lastHash || "#/home");
     return;
   }
+  // 企業ページの中で選考ルートを切り替えたときは、位置を保って開いたルートを見せる
+  const same = (h) => h.match(/^#\/c\/([^/?]+)(?:\/([^/?]+))?$/);
+  const a = same(lastHash);
+  const b = same(location.hash);
+  const inPage = a && b && a[1] === b[1] && a[2] !== "edit" && b[2] !== "edit";
   lastHash = location.hash;
   render();
-  window.scrollTo(0, 0);
+  if (inPage) document.querySelector(".prog-list .is-open")?.scrollIntoView({ block: "nearest" });
+  else window.scrollTo(0, 0);
 });

@@ -1,10 +1,10 @@
 // 画面: 企業一覧
 
-import { COMPANY_TABS, IND_CLASS, INDUSTRIES, SORTS } from "../config.js";
+import { COMPANY_TABS, ENDED, IND_CLASS, INDUSTRIES, SORTS } from "../config.js";
 import { daysUntil, fmtDate, remainText, urgency } from "../dates.js";
 import { esc } from "../md.js";
-import { byWhen, companyState, hasLogin, nextEvent } from "../model.js";
-import { avatar, companyStatusLine, ICONS, loginButtons, stars } from "../parts.js";
+import { byWhen, companyState, hasLogin, isEnded, nextEvent } from "../model.js";
+import { avatar, ICONS, loginButtons, progRow, sortPrograms, stars } from "../parts.js";
 import { state, ui } from "../store.js";
 
 export function currentTab() {
@@ -43,20 +43,27 @@ export function companyRows() {
   // 名前で探しているときは、タブに関係なく全部の企業から出す（ログイン情報を引くため）
   const items = companyPool().filter((c) => searching() || test(companyState(c))).sort(order);
 
+  // 企業の下に、選考ルート（本選考・インターン・説明会など）を1行ずつ。
+  // 進んでいる企業では、終わったルートはまとめて件数だけ出す
   const row = (c) => {
-    const nx = nextEvent(c);
+    const progs = sortPrograms(c);
+    const shown = isEnded(c) ? progs : progs.filter((p) => !ENDED.has(p.state));
+    const hidden = progs.length - shown.length;
+    // どのルートにも属さない予定
+    const loose = c.events.filter((e) => !e.program || !c.programs.some((p) => p.id === e.program));
+    const nx = nextEvent({ events: loose });
     return `
       <li class="co-item">
         <a class="co-row" href="#/c/${esc(c.slug)}">
           ${avatar(c)}
           <span class="co-body">
             <span class="co-top"><span class="co-name">${esc(c.name)}</span>${stars(c)}</span>
-            <span class="co-status">${companyStatusLine(c)}</span>
-            ${nx ? `<span class="co-next ${urgency(daysUntil(nx.date))}"><span>${esc(fmtDate(nx.date))}</span>${esc(nx.title)}<em>${esc(remainText(daysUntil(nx.date)))}</em></span>` : ""}
             ${ui.sort === "salary" ? `<span class="co-salary">${c.salary ? `初任給 ¥${Number(c.salary).toLocaleString()}` : "初任給 不明"}</span>` : ""}
           </span>
           <span class="co-ind"><i class="ind-dot ${IND_CLASS[c.industry] || "other"}"></i>${esc(c.industry || "")}</span>
         </a>
+        ${shown.length || hidden ? `<ul class="cp-list">${shown.map((p) => `<li>${progRow(c, p)}</li>`).join("")}${hidden ? `<li class="cp-more">ほかに終了 ${hidden}件</li>` : ""}</ul>` : ""}
+        ${nx ? `<p class="co-next ${urgency(daysUntil(nx.date))}"><span>${esc(fmtDate(nx.date))}</span>${esc(nx.title)}<em>${esc(remainText(daysUntil(nx.date)))}</em></p>` : ""}
         ${hasLogin(c) ? `<div class="co-login">${loginButtons(c)}</div>` : ""}
       </li>`;
   };

@@ -58,16 +58,12 @@
 .co-item { border-bottom: 1px solid var(--rule); }
 .co-item .co-row { grid-template-columns: auto 1fr auto; border-bottom: 0; }
 .co-top { display: flex; align-items: baseline; gap: 4px; }
-.co-status { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 0.8125rem; }
-.co-step { font-size: 0.875rem; }
-.co-kinds { color: var(--faint); font-size: 0.75rem; }
 /* 1行目に日付と残り日数、内容は折り返して下に */
 .co-next { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; }
 .co-next span { order: -2; flex: none; font-family: var(--num); font-size: 0.9375rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .co-next em { order: -1; flex: 1; font-style: normal; font-weight: 700; white-space: nowrap; }
 .co-item .co-ind { align-self: start; padding-top: 2px; color: var(--muted); font-size: 0.6875rem; white-space: nowrap; }
 .co-item .co-ind .ind-dot { width: 7px; height: 7px; margin-right: 4px; }
-.co-progs { display: flex; flex-wrap: wrap; gap: 4px 12px; }
 .co-salary { color: var(--ink); font-family: var(--num); font-size: 0.9375rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 /* 一覧の行の下に、マイページを開く・ID と PW のコピー */
 .co-login { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 0 12px 52px; }

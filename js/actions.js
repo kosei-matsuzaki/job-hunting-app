@@ -35,13 +35,17 @@ async function updateProgram(slug, pid, patch, note) {
   const text = label + note;
   const before = Object.fromEntries(Object.keys(patch).map((k) => [k, p[k]]));
   const lastAction = c.lastAction;
+  // 段階や状況が変わったら、待っていた結果の連絡は来たということなので済みにする
+  const closing = c.events.filter((e) => e.program === pid && e.kind === "result" && !e.done).map((e) => `${e.title} @ ${e.date}`);
+  const isClosing = (e) => e.program === pid && e.kind === "result" && closing.includes(`${e.title} @ ${e.date}`);
   const ok = await commit(() => {
     const x = bySlug(slug);
     const q = programOf(x, pid);
     if (!q) return;
     Object.assign(q, patch);
+    for (const e of x.events) if (isClosing(e)) e.done = true;
     x.lastAction = isoToday();
-    x.history = [{ date: isoToday(), text }, ...(x.history || [])];
+    if (x.history?.[0]?.text !== text || x.history[0].date !== isoToday()) x.history = [{ date: isoToday(), text }, ...(x.history || [])];
   }, `${c.name}: ${text}`, { quiet: true });
   render();
   if (!ok) return;
@@ -51,6 +55,7 @@ async function updateProgram(slug, pid, patch, note) {
       const q = programOf(x, pid);
       if (!q) return;
       Object.assign(q, before);
+      for (const e of x.events) if (isClosing(e)) delete e.done;
       x.lastAction = lastAction;
       const i = (x.history || []).findIndex((h) => h.text === text);
       if (i >= 0) x.history.splice(i, 1);
@@ -88,6 +93,20 @@ export function statusClick(t) {
     if (idx + 1 < p.flow.length) return updateProgram(slug, pid, { step: p.flow[idx + 1], state: "todo" }, `${p.flow[idx]}を通過した`);
     return updateProgram(slug, pid, { state: "offer" }, `${p.flow[idx]}を通過して内定`);
   }
+}
+
+// 結果の連絡の予定日を入れる（そのルートのまだ来ていない結果の予定は1つにまとめる）
+export async function setResultDate(slug, pid, date) {
+  const c = bySlug(slug);
+  const p = programOf(c, pid);
+  if (!p || !date) return;
+  const title = `${p.step || p.flow[0] || "選考"}の結果`;
+  await commit(() => {
+    const x = bySlug(slug);
+    if (!programOf(x, pid)) return;
+    x.events = [...x.events.filter((e) => !(e.program === pid && e.kind === "result" && !e.done)), { title, date, program: pid, kind: "result" }];
+  }, `${c.name}: ${title}の連絡予定を${date}に`);
+  render();
 }
 
 // 企業ページで直接書き換えるもの: マイページ・やること・記録

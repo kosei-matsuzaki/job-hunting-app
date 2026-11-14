@@ -139,3 +139,4 @@ i.done { background: var(--faint); }
   /* ホーム: 締切と今週を左、選考中を右 */
   .dash { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(320px, 1fr); gap: 0 40px; align-items: start; }
 }
+i.result { background: none; box-shadow: inset 0 0 0 1.5px var(--ink); }

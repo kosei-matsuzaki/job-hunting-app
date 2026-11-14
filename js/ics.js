@@ -12,7 +12,10 @@ const compactDate = (date) => date.replace(/-/g, "");
 
 const nextDayCompact = (date) => compactDate(isoOf(addDays(parseDate(date), 1)));
 
-const calTitle = (e, c) => `${e.kind === "event" ? "" : "【締切】"}${c.name} ${e.title}`;
+const calTitle = (e, c) => `${{ event: "", result: "【結果】" }[e.kind] ?? "【締切】"}${c.name} ${e.title}`;
+
+// 通知: 締切は前日、日程は2時間前、結果の連絡は当日の朝9時（終日）か時刻ちょうど
+const trigger = (e) => (e.kind === "event" ? "-PT2H" : e.kind === "result" ? (e.time ? "PT0M" : "PT9H") : "-P1D");
 
 export function googleCalUrl(e, c) {
   const dates = e.time
@@ -59,7 +62,7 @@ function icsText(items) {
       "BEGIN:VALARM",
       "ACTION:DISPLAY",
       `DESCRIPTION:${escT(calTitle(e, c))}`,
-      `TRIGGER:${e.kind === "event" ? "-PT2H" : "-P1D"}`,
+      `TRIGGER:${trigger(e)}`,
       "END:VALARM",
       "END:VEVENT",
     );

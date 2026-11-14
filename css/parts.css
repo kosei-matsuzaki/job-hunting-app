@@ -178,3 +178,44 @@
   line-height: 1.6;
   white-space: nowrap;
 }
+
+/* 選考ルートの行（企業一覧・企業ページ）: 種類｜名前｜状況、2行目に次の予定か結果の連絡日 */
+.cp-list { margin: -6px 0 0; padding: 0 0 10px 52px; list-style: none; }
+.cp-row {
+  display: grid;
+  grid-template-columns: 4.6em minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px 8px;
+  padding: 6px 0;
+  border-top: 1px dashed var(--rule);
+  color: var(--ink);
+  font-size: 0.8125rem;
+  text-decoration: none;
+}
+.cp-list li:first-child .cp-row { border-top: 0; }
+.cp-row .kind { justify-self: start; min-width: 4.2em; text-align: center; }
+.cp-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cp-row:hover .cp-title { text-decoration: underline; text-underline-offset: 3px; }
+.cp-state { display: flex; align-items: center; justify-self: end; gap: 6px; }
+.cp-step { font-size: 0.8125rem; white-space: nowrap; }
+.cp-closed { color: var(--faint); font-size: 0.6875rem; white-space: nowrap; }
+.cp-when { grid-column: 2 / -1; display: flex; align-items: baseline; gap: 0 8px; min-width: 0; color: var(--muted); font-size: 0.75rem; }
+.cp-when b { flex: none; color: var(--ink); font-family: var(--num); font-size: 0.875rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cp-when .tag { flex: none; margin: 0; }
+.cp-ev { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cp-when em { flex: none; margin-left: auto; font-style: normal; font-weight: 700; white-space: nowrap; }
+.cp-when.urgent, .cp-when.urgent b { color: var(--shu); }
+.cp-when.soon em { color: var(--early); }
+.cp-when.late em { color: var(--faint); font-weight: 500; }
+/* 結果の連絡日は相手の番なので、墨の破線で囲む */
+.cp-when.is-result b { padding: 0 5px; border: 1px dashed var(--ink); border-radius: 3px; font-family: var(--font); font-size: 0.75rem; font-weight: 700; }
+.cp-when.is-result.urgent b { border-color: var(--shu); }
+.cp-row.st-skip, .cp-row.st-declined, .cp-row.st-rejected { opacity: 0.6; }
+.cp-more { padding: 4px 0 0; color: var(--faint); font-size: 0.75rem; }
+.co-item > .co-next { margin: -4px 0 0; padding: 0 0 10px 52px; }
+
+.tag.result { border: 1px dashed var(--ink); background: none; color: var(--ink); }
+.ev-row.is-result .ev-time { color: var(--ink); }
+.ar-next em { margin-left: 8px; font-style: normal; font-weight: 700; }
+.ar-next.is-result { color: var(--ink); }
+.ar-next.is-result.late em { color: var(--faint); font-weight: 500; }

@@ -2,25 +2,51 @@
 
 import { ENDED, KIND_CLASS, PRIORITY_LABEL, STATE_GROUPS, STATES } from "../config.js";
 import { hasNote } from "../data.js";
-import { daysUntil, fmtDate, remainText, urgency, whenText } from "../dates.js";
+import { daysUntil, fmtDate, isoOf, remainText, today, addDays, urgency, whenText } from "../dates.js";
 import { googleCalUrl } from "../ics.js";
 import { esc, renderMarkdown } from "../md.js";
-import { bySlug, byWhen, defaultProgram, flowIndex, hasLogin, isWaiting, nextEvent, programOf } from "../model.js";
-import { avatar, eventTitle, ICONS, kindBadge, progPill, statePill } from "../parts.js";
+import { bySlug, byWhen, defaultProgram, flowIndex, hasLogin, isWaiting, nextEvent, programOf, resultEvent } from "../model.js";
+import { avatar, eventTitle, ICONS, kindBadge, progPill, progRow, resultWhen, sortPrograms, statePill } from "../parts.js";
 import { companyPieces } from "./docs.js";
 import { state } from "../store.js";
 
-function programPanel(c, p) {
+// 結果待ちのとき: 結果の連絡がいつ来るかをカレンダーに入れる・変える
+function resultBox(c, p) {
+  const r = resultEvent(c, p.id);
+  const key = `${esc(c.slug)}:${esc(p.id)}`;
+  const form = (label) => `<form class="result-form" data-result="${key}">
+      <input type="date" name="date" required min="${isoOf(addDays(today(), -30))}" value="${esc(r?.date || "")}" aria-label="結果の連絡の予定日">
+      <button class="btn small${r ? "" : " primary"}" type="submit">${label}</button>
+    </form>`;
+  if (!r) {
+    return `<div class="result-box is-empty">
+      <p class="result-head">結果はいつ頃？</p>
+      <p class="hint">案内に「○日までに連絡」とあれば、その日を入れるとカレンダーとホームに「結果」として出ます。</p>
+      ${form("カレンダーに入れる")}
+    </div>`;
+  }
+  const w = resultWhen(r);
+  return `<div class="result-box ${w.cls}">
+    <p class="result-head"><span class="tag result">結果</span><b>${esc(w.text)}</b><em>${esc(w.left)}</em></p>
+    <p class="hint">${daysUntil(r.date) < 0 ? "予定日を過ぎました。連絡を確かめて、通過・不合格を押してください。" : "連絡が来たら、下のボタンで通過・不合格を記録します（この予定は自動で済みになります）。"}</p>
+    <details class="result-edit"><summary>日付を変える</summary>${form("変える")}</details>
+  </div>`;
+}
+
+function programPanel(c, p, { inList = false } = {}) {
   const s = p.state;
   const idx = flowIndex(p);
   const slug = esc(c.slug);
   const key = `${slug}:${esc(p.id)}`;
-  let html = `
-    <section class="prog-panel ${KIND_CLASS[p.kind] || "main"}">
+  const open = p.status && p.status !== "不明" ? `<span class="open ${p.status === "受付中" ? "on" : ""}" title="募集の受付">${esc(p.status)}</span>` : "";
+  let html = inList
+    ? `<section class="prog-panel in-list ${KIND_CLASS[p.kind] || "main"}">
+      ${p.period || open ? `<p class="prog-period">${open}${esc(p.period || "")}</p>` : ""}`
+    : `<section class="prog-panel ${KIND_CLASS[p.kind] || "main"}">
       <div class="prog-head">
         ${kindBadge(p.kind)}
         <h2 class="prog-title">${esc(p.title || p.kind)}</h2>
-        ${p.status && p.status !== "不明" ? `<span class="open ${p.status === "受付中" ? "on" : ""}" title="募集の受付">${esc(p.status)}</span>` : ""}
+        ${open}
       </div>
       ${p.period ? `<p class="prog-period">${esc(p.period)}</p>` : ""}`;
   const nx = nextEvent(c, p.id);
@@ -32,8 +58,9 @@ function programPanel(c, p) {
   // 状況: 押すとシートで選べる
   const waiting = isWaiting(c, p);
   html += `<button class="status-btn ${s}" data-sheet="${key}" aria-haspopup="dialog">
-      ${progPill(c, p)}<span class="status-text">${esc(waiting ? "これからの予定がない。連絡が来たら段階を進めるか予定を足す" : STATES[s].hint)}</span><span class="status-change">変更</span>
+      ${progPill(c, p)}<span class="status-text">${esc(waiting ? "相手からの連絡を待っている" : STATES[s].hint)}</span><span class="status-change">変更</span>
     </button>`;
+  if (waiting) html += resultBox(c, p);
 
   if (p.flow.length) {
     html += `<ol class="route${ENDED.has(s) ? " dim" : ""}">`;
@@ -184,15 +211,20 @@ export function viewCompany(slug, pid) {
     ${loginCard(c)}
     <div class="co-layout"><div class="co-main">`;
 
+  // 選考ルートが複数あれば、全部の状況を1行ずつ並べ、選んだルートの中身をその下に開く
   if (c.programs.length > 1) {
-    html += `<div class="prog-tabs" role="tablist">${c.programs
-      .map((q) => `<a role="tab" href="#/c/${slugE}/${esc(q.id)}" aria-selected="${q.id === p.id}">
-        ${kindBadge(q.kind)}<span class="pt-title">${esc(q.title || q.kind)}</span><span class="pt-state">${statePill(q.state)}</span></a>`)
-      .join("")}</div>`;
+    const counts = Object.entries(c.programs.reduce((m, q) => ({ ...m, [q.state]: (m[q.state] || 0) + 1 }), {}))
+      .sort(([a], [b]) => Object.keys(STATES).indexOf(a) - Object.keys(STATES).indexOf(b))
+      .map(([st, n]) => `${STATES[st].label} ${n}`).join("・");
+    html += `<h2 class="sec">選考ルート<span class="count">${c.programs.length}</span><span class="sec-sub">${esc(counts)}</span></h2>
+      <ol class="prog-list">${sortPrograms(c)
+        .map((q) => `<li class="${q.id === p.id ? "is-open" : ""}">${progRow(c, q, { current: q.id === p.id })}${q.id === p.id ? programPanel(c, q, { inList: true }) : ""}</li>`)
+        .join("")}</ol>`;
+  } else {
+    html += p
+      ? programPanel(c, p)
+      : `<section class="empty-panel">選考ルート（本選考・インターンなど）が登録されていません。<a href="#/c/${slugE}/edit">編集から追加</a></section>`;
   }
-  html += p
-    ? programPanel(c, p)
-    : `<section class="empty-panel">選考ルート（本選考・インターンなど）が登録されていません。<a href="#/c/${slugE}/edit">編集から追加</a></section>`;
 
   const events = c.events.map((e, i) => ({ ...e, c, i, p: programOf(c, e.program) })).sort(byWhen);
   html += `</div><div class="co-side"><section class="card"><h2 class="sec">予定<a class="sec-link" href="#/add?c=${slugE}">追加</a></h2>`;

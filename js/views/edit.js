@@ -96,7 +96,7 @@ export function viewEdit(slug) {
 export function readEvent(fs) {
   const v = (n) => fs.querySelector(`[name="${n}"]`);
   const e = { title: v("title").value.trim(), date: v("date").value };
-  if (v("kind")?.value === "event") e.kind = "event";
+  if (["event", "result"].includes(v("kind")?.value)) e.kind = v("kind").value;
   if (v("program")?.value) e.program = v("program").value;
   if (v("time").value) e.time = v("time").value;
   if (v("start").value) e.start = v("start").value;

@@ -27,17 +27,35 @@ export function allEvents() {
 
 export const liveEvents = () => allEvents().filter((e) => !e.done && !isEnded(e.c));
 
+// 結果の連絡の予定（相手の番なので、自分の次の予定には数えない）
+export const isResult = (e) => e.kind === "result";
+
+// これからの自分の予定（締切・日程）。結果の連絡は除く
 export function nextEvent(c, pid) {
   return c.events
-    .filter((e) => !e.done && daysUntil(e.date) >= 0 && (!pid || e.program === pid))
+    .filter((e) => !e.done && !isResult(e) && daysUntil(e.date) >= 0 && (!pid || e.program === pid))
     .sort(byWhen)[0];
+}
+
+// まだ来ていない結果の連絡（日付を過ぎていても、済みにするまでは残す）
+export function resultEvent(c, pid) {
+  return c.events.filter((e) => !e.done && isResult(e) && e.program === pid).sort(byWhen)[0];
 }
 
 export function defaultProgram(c) {
   return [...c.programs].sort((a, b) => STATE_RANK[a.state] - STATE_RANK[b.state])[0];
 }
 
-// 選考中で、そのルートにこれからの予定がない（相手の番）
-export const isWaiting = (c, p) => p.state === "todo" && !nextEvent(c, p.id);
+// 選考中のルートで、いま待っている結果の連絡。自分の次の予定より先に来るものだけ
+// （例: 11/25 までに書類の結果 → 通れば 12/5 に当日。いまは結果待ち）
+export function pendingResult(c, p) {
+  if (p.state !== "todo") return null;
+  const r = resultEvent(c, p.id);
+  const nx = nextEvent(c, p.id);
+  return r && (!nx || r.date <= nx.date) ? r : null;
+}
+
+// 選考中で、そのルートにこれからの予定がないか、結果の連絡を先に待っている（相手の番）
+export const isWaiting = (c, p) => p.state === "todo" && (!nextEvent(c, p.id) || !!pendingResult(c, p));
 
 export const hasLogin = (c) => !!(c.mypage.url || c.mypage.id || c.mypage.password);

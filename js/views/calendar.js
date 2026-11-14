@@ -4,7 +4,7 @@ import { WD } from "../config.js";
 import { addDays, dayLabel, fmtDate, isoOf, isoToday, parseDate } from "../dates.js";
 import { esc } from "../md.js";
 import { allEvents, byWhen, isEnded } from "../model.js";
-import { eventRow, ICONS } from "../parts.js";
+import { eventRow, evClass, ICONS } from "../parts.js";
 
 export function viewCalendar(sel) {
   const selected = /^\d{4}-\d{2}-\d{2}$/.test(sel || "") ? sel : isoToday();
@@ -48,12 +48,12 @@ export function viewCalendar(sel) {
       ].join(" ");
       const dots = evs
         .slice(0, 3)
-        .map((e) => `<i class="${e.done ? "done" : e.kind === "event" ? "event" : "deadline"}"></i>`)
+        .map((e) => `<i class="${e.done ? "done" : evClass(e)}"></i>`)
         .join("");
       // 広い画面では点の代わりに企業名を出す
       const chips = evs
         .slice(0, 3)
-        .map((e) => `<span class="cal-ev ${e.done ? "done" : e.kind === "event" ? "event" : "deadline"}">${esc(e.c.name)}</span>`)
+        .map((e) => `<span class="cal-ev ${e.done ? "done" : evClass(e)}">${esc(e.c.name)}</span>`)
         .join("");
       html += `<a role="gridcell" class="cal-cell ${cls}" href="#/calendar/${iso}" aria-label="${esc(fmtDate(iso, true))} 予定${evs.length}件"${iso === selected ? ' aria-selected="true"' : ""}>
         <span class="cal-d">${day.getDate()}</span><span class="cal-dots">${dots}${evs.length > 3 ? "<b>+</b>" : ""}</span>
@@ -62,7 +62,7 @@ export function viewCalendar(sel) {
     html += `</div>`;
   }
   html += `</div>
-    <p class="cal-legend"><i class="deadline"></i>締切 <i class="event"></i>日程 <i class="done"></i>済み</p>
+    <p class="cal-legend"><i class="deadline"></i>締切 <i class="event"></i>日程 <i class="result"></i>結果の連絡 <i class="done"></i>済み</p>
     </div><div class="cal-aside">`;
 
   const dayEvents = (byDate.get(selected) || []).sort(byWhen);

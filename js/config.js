@@ -61,6 +61,9 @@ export const COMPANY_TABS = [
 
 export const KINDS = ["本選考", "インターン", "早期選考", "説明会・イベント"];
 
+// 一覧で使う短い名前
+export const KIND_SHORT = { 本選考: "本選考", インターン: "インターン", 早期選考: "早期", "説明会・イベント": "説明会" };
+
 export const KIND_CLASS = { 本選考: "main", インターン: "intern", 早期選考: "early", "説明会・イベント": "info" };
 
 export const OPEN_STATUSES = ["受付中", "受付前", "終了", "不明"];
@@ -82,6 +85,7 @@ export const PRIORITY_LABEL = { 3: "第一志望群", 2: "受けたい", 1: "様
 export const EVENT_KINDS = [
   { v: "deadline", label: "締切（ES・Webテスト・エントリーなど）" },
   { v: "event", label: "日程（面接・説明会・インターン当日など）" },
+  { v: "result", label: "結果の連絡（この日までに来る予定）" },
 ];
 
 export const WD = "日月火水木金土";

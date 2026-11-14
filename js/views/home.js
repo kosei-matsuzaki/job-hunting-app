@@ -3,8 +3,8 @@
 import { COMPANY_TABS, PAST_DAYS, WD } from "../config.js";
 import { addDays, dayLabel, daysUntil, fmtDate, isoOf, today, urgency, whenText } from "../dates.js";
 import { esc } from "../md.js";
-import { byWhen, companyState, isEnded, isWaiting, liveEvents, nextEvent } from "../model.js";
-import { avatar, eventRow, groupByDay, kindBadge, routeMini } from "../parts.js";
+import { byWhen, companyState, isEnded, isResult, isWaiting, liveEvents, nextEvent, pendingResult } from "../model.js";
+import { avatar, eventRow, groupByDay, kindBadge, resultWhen, routeMini } from "../parts.js";
 import { state } from "../store.js";
 
 export function viewHome() {
@@ -15,8 +15,13 @@ export function viewHome() {
   const week = upcoming.filter((e) => daysUntil(e.date) <= 6);
   const overdue = live.filter((e) => daysUntil(e.date) < 0 && daysUntil(e.date) >= -PAST_DAYS).sort(byWhen);
   const active = state.companies
-    .flatMap((c) => c.programs.filter((p) => p.state === "todo").map((p) => ({ c, p, nx: nextEvent(c, p.id) })))
-    .sort((a, b) => (a.nx && b.nx ? byWhen(a.nx, b.nx) : a.nx ? -1 : b.nx ? 1 : 0));
+    .flatMap((c) => c.programs.filter((p) => p.state === "todo").map((p) => {
+      // 結果の連絡を先に待っているなら、そちらを出す
+      const r = pendingResult(c, p);
+      return { c, p, nx: r ? null : nextEvent(c, p.id), r };
+    }))
+    // 自分の予定があるもの → 結果の連絡日が分かっているもの → どちらもないもの
+    .sort((a, b) => !a.nx - !b.nx || !a.r - !b.r || byWhen(a.nx || a.r || { date: "9999" }, b.nx || b.r || { date: "9999" }));
   const count = (tab) => state.companies.filter((c) => COMPANY_TABS.find((x) => x.v === tab).test(companyState(c))).length;
 
   let html = `
@@ -29,7 +34,9 @@ export function viewHome() {
     <div class="dash"><div class="dash-main">`;
 
   // 説明会より、応募（本選考・インターン）の締切を先に出す
-  const next = upcoming.find((e) => e.p?.kind !== "説明会・イベント") || upcoming[0];
+  // 結果の連絡は相手の番なので、日めくりには出さない
+  const mine = upcoming.filter((e) => !isResult(e));
+  const next = mine.find((e) => e.p?.kind !== "説明会・イベント") || mine[0];
   if (next) {
     const n = daysUntil(next.date);
     const m = next.c.mypage;
@@ -56,12 +63,12 @@ export function viewHome() {
     const d = addDays(t, i);
     const iso = isoOf(d);
     const dayEvents = week.filter((e) => e.date === iso);
-    const hasDeadline = dayEvents.some((e) => e.kind !== "event");
+    const mark = dayEvents.some((e) => !e.kind || e.kind === "deadline") ? "deadline" : dayEvents.some((e) => e.kind === "event") ? "event" : "result";
     html += `
       <li><a href="#/calendar/${iso}" class="${i === 0 ? "today" : ""} ${dayEvents.length ? "has" : ""}" aria-label="${esc(fmtDate(iso))} 予定${dayEvents.length}件">
         <span class="ws-wd ${d.getDay() === 0 ? "sun" : d.getDay() === 6 ? "sat" : ""}">${WD[d.getDay()]}</span>
         <span class="ws-d">${d.getDate()}</span>
-        <span class="ws-n">${dayEvents.length ? `<i class="${hasDeadline ? "deadline" : "event"}"></i>${dayEvents.length > 1 ? dayEvents.length : ""}` : ""}</span>
+        <span class="ws-n">${dayEvents.length ? `<i class="${mark}"></i>${dayEvents.length > 1 ? dayEvents.length : ""}` : ""}</span>
       </a></li>`;
   }
   html += `</ol>`;
@@ -84,7 +91,7 @@ export function viewHome() {
 
   if (active.length) {
     html += `<section class="card"><h2 class="sec">選考中<span class="count">${active.length}</span></h2><ul class="active-list">`;
-    for (const { c, p, nx } of active) {
+    for (const { c, p, nx, r } of active) {
       html += `
         <li><a class="active-row" href="#/c/${esc(c.slug)}/${esc(p.id)}">
           ${avatar(c)}
@@ -92,6 +99,8 @@ export function viewHome() {
             <span class="ar-name">${esc(c.name)}</span>
             <span class="ar-prog">${routeMini(p)}<b>${esc(p.step || "")}</b>${isWaiting(c, p) ? '<span class="tag wait">結果待ち</span>' : ""}${c.programs.length > 1 ? kindBadge(p.kind) : ""}</span>
             ${nx ? `<span class="ar-next ${urgency(daysUntil(nx.date))}">${esc(fmtDate(nx.date))} ${esc(nx.title)}</span>` : ""}
+            ${r ? (() => { const w = resultWhen(r); return `<span class="ar-next is-result ${w.cls}">${esc(w.text)}<em>${esc(w.left)}</em></span>`; })() : ""}
+            ${!nx && !r ? `<span class="ar-next faint">結果の連絡日は未登録</span>` : ""}
           </span>
         </a></li>`;
     }
