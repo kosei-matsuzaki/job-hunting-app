@@ -78,36 +78,56 @@ export async function loadCompanies() {
 }
 
 // 変更を当てて保存する。別の端末が先に保存していたら、最新を読み直して同じ変更を当て直す。
-// apply は state.companies を slug で引いて書き換える関数（何度呼ばれても同じ結果になるように書く）
-export async function commit(apply, message, { quiet = false } = {}) {
-  const snapshot = JSON.stringify(state.companies);
+// apply は state.companies を slug で引いて書き換える関数（何度呼ばれても同じ結果になるように書く）。
+// 保存は1つずつ順に行う（続けて押したとき、前の保存の途中の内容に次の変更を重ねて食い違わないように）
+let queue = Promise.resolve();
+export function commit(apply, message, opts) {
+  const run = queue.then(() => commitNow(apply, message, opts));
+  queue = run.catch(() => {});
+  return run;
+}
+
+// 保存の途中でないか（裏での読み直しは、保存が終わるまで待つ）
+export const saving = () => state.saving > 0;
+export const idle = () => queue;
+
+// keepView: フォームから保存するときは描き直さない（保存できなかったとき、書いた内容を消さないように）
+async function commitNow(apply, message, { quiet = false, keepView = false } = {}) {
+  // 失敗したら、内容と sha の両方を保存前に戻す（sha だけ新しいと、次の保存で別の端末の変更を上書きしてしまう）
+  const snapshot = { companies: JSON.stringify(state.companies), sha: state.sha };
+  state.saving = (state.saving || 0) + 1;
   apply();
-  render();
-  for (let attempt = 0; ; attempt++) {
-    try {
-      const text = JSON.stringify({ companies: state.companies }, null, 2) + "\n";
-      state.sha = await writeFile(DATA_PATH, text, state.sha, message);
-      saveCache();
-      if (!quiet || attempt) toast(attempt ? "別の端末の変更と合わせて保存しました" : "保存しました");
-      return attempt ? MERGED : true;
-    } catch (err) {
-      let e = err;
-      if ((e.status === 409 || e.status === 422) && attempt < 2) {
-        try {
-          const latest = await readFile(DATA_PATH);
-          state.companies = (JSON.parse(latest.text).companies || []).map(normalize);
-          state.sha = latest.sha;
-          apply();
-          continue;
-        } catch (reloadError) {
-          e = reloadError;
+  if (!keepView) render();
+  try {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const text = JSON.stringify({ companies: state.companies }, null, 2) + "\n";
+        state.sha = await writeFile(DATA_PATH, text, state.sha, message);
+        saveCache();
+        if (!quiet || attempt) toast(attempt ? "別の端末の変更と合わせて保存しました" : "保存しました");
+        return attempt ? MERGED : true;
+      } catch (err) {
+        let e = err;
+        if ((e.status === 409 || e.status === 422) && attempt < 2) {
+          try {
+            const latest = await readFile(DATA_PATH);
+            state.companies = (JSON.parse(latest.text).companies || []).map(normalize);
+            state.sha = latest.sha;
+            apply();
+            continue;
+          } catch (reloadError) {
+            e = reloadError;
+          }
         }
+        state.companies = JSON.parse(snapshot.companies);
+        state.sha = snapshot.sha;
+        if (!keepView) render();
+        toast(`${explain(e)}（変更は保存されていません）`, true);
+        return false;
       }
-      state.companies = JSON.parse(snapshot);
-      render();
-      toast(`${explain(e)}（変更は保存されていません）`, true);
-      return false;
     }
+  } finally {
+    state.saving--;
   }
 }
 
@@ -176,6 +196,14 @@ export function loadAllDocs() {
     return true;
   });
   return loadingAll;
+}
+
+// 新しく作ったファイルを素材の一覧に足す（端末の控えも）
+export function addDocPath(dir, path) {
+  const g = state.docs?.find((x) => x.dir === dir);
+  if (!g || g.paths.includes(path)) return;
+  g.paths.push(path);
+  store.set("jh.doclist", JSON.stringify(state.docs));
 }
 
 export const hasNote = (slug) => state.docs?.find((g) => g.dir === "notes")?.paths.includes(`notes/${slug}.md`);

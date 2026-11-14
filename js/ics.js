@@ -22,6 +22,26 @@ export function googleCalUrl(e, c) {
   return `https://calendar.google.com/calendar/render?${q}`;
 }
 
+// 1行は75バイトまで（RFC 5545）。長い行は続きの行（先頭に空白）に折り返す。日本語は文字の途中で切らない
+function fold(line) {
+  const enc = new TextEncoder();
+  const out = [];
+  let cur = "";
+  let size = 0;
+  for (const ch of line) {
+    const n = enc.encode(ch).length;
+    if (size + n > (out.length ? 74 : 75)) {
+      out.push(cur);
+      cur = "";
+      size = 0;
+    }
+    cur += ch;
+    size += n;
+  }
+  out.push(cur);
+  return out.join("\r\n ");
+}
+
 function icsText(items) {
   const escT = (t) => String(t).replace(/\\/g, "\\\\").replace(/[;,]/g, (m) => "\\" + m).replace(/\n/g, "\\n");
   const now = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
@@ -45,7 +65,7 @@ function icsText(items) {
     );
   }
   lines.push("END:VCALENDAR");
-  return lines.join("\r\n") + "\r\n";
+  return lines.map(fold).join("\r\n") + "\r\n";
 }
 
 export function downloadIcs(name, items) {

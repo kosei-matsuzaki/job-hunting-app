@@ -17,6 +17,9 @@ import { viewLogin, viewSettings } from "./views/settings.js";
 
 export const $view = () => document.getElementById("view");
 
+// 画面のフォームに、まだ保存していない書きかけがあるか（入力すると data-dirty が付く）
+export const isDirty = () => !!document.querySelector("#view form[data-dirty]");
+
 export function route() {
   const [path, query = ""] = location.hash.replace(/^#\/?/, "").split("?");
   return { parts: (path || "home").split("/").map(decodeURIComponent), query: new URLSearchParams(query) };

@@ -32,7 +32,15 @@ export function inline(text, ctx = {}) {
   let s = esc(text);
   s = s.replace(/`([^`]+)`/g, (_, code) => hold(`<code>${code}</code>`));
   s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, label, href) => hold(link(label, href, ctx)));
-  s = s.replace(/https?:\/\/[^\s<>（）「」、。]+/g, (url) => hold(link(url, url, ctx)));
+  // 「(https://…)」の閉じ括弧や文末の句読点は URL に含めない（URL の中で開いた括弧の閉じは残す）
+  s = s.replace(/https?:\/\/[^\s<>（）「」、。]+/g, (url) => {
+    let [, body, tail = ""] = url.match(/^(.*?)([.,;:!?)]+)?$/);
+    while (tail.startsWith(")") && (body.match(/\(/g) || []).length > (body.match(/\)/g) || []).length) {
+      body += ")";
+      tail = tail.slice(1);
+    }
+    return hold(link(body, body, ctx)) + tail;
+  });
   s = s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   s = s.replace(/~~(.+?)~~/g, "<del>$1</del>");
   return s.replace(/\u0000(\d+)\u0000/g, (_, i) => tokens[i]);

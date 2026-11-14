@@ -141,16 +141,18 @@ export function readForm(form) {
 }
 
 export function viewAddEvent(date, slug) {
+  // 企業ページから来たときは、終了した企業でもその企業を選べるようにする
   const options = [...state.companies]
-    .filter((c) => !isEnded(c))
+    .filter((c) => !isEnded(c) || c.slug === slug)
     .sort((a, b) => a.name.localeCompare(b.name, "ja"))
     .map((c) => `<option value="${esc(c.slug)}"${c.slug === slug ? " selected" : ""}>${esc(c.name)}</option>`)
     .join("");
   const c = bySlug(slug);
+  const back = c ? `<a class="back" href="#/c/${esc(c.slug)}">${esc(c.name)}</a>` : `<a class="back" href="#/calendar${date ? `/${esc(date)}` : ""}">予定</a>`;
   return `
-    <a class="back" href="#/calendar${date ? `/${esc(date)}` : ""}">予定</a>
+    ${back}
     <h1 class="page-title">予定を追加</h1>
-    <form id="addev">
+    <form id="addev"${c ? ' data-from="company"' : ""}>
       <label>企業<select name="company" required><option value="">選んでください</option>${options}</select></label>
       ${eventFieldset({ date: date || "" }, c?.programs || [], false)}
       <button class="btn primary wide" type="submit">追加する</button>

@@ -28,6 +28,7 @@ export const state = {
   sha: null,
   loaded: false,
   loading: false,
+  saving: 0,
   error: null,
   offline: false,
   docs: null,

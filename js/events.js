@@ -2,13 +2,13 @@
 
 import { addRecord, addTodo, finishTodo, markDone, saveMypage, statusClick, undoable } from "./actions.js";
 import { DEFAULT_FLOW, FINALS_DIR, PRIORITY_LABEL } from "./config.js";
-import { commit, DOC_KEY, loadCompanies, loadDocList, newId, normalize, saveDoc } from "./data.js";
+import { addDocPath, commit, DOC_KEY, idle, loadCompanies, loadDocList, newId, normalize, saveDoc } from "./data.js";
 import { daysUntil, isoToday } from "./dates.js";
 import { explain, writeFile } from "./github.js";
 import { downloadIcs } from "./ics.js";
 import { esc } from "./md.js";
 import { bySlug, liveEvents, programOf } from "./model.js";
-import { $view, render, renderChrome } from "./render.js";
+import { $view, isDirty, render, renderChrome } from "./render.js";
 import { cfg, state, store, ui } from "./store.js";
 import { copy, takeToastAction, toast } from "./toast.js";
 import { openSheet } from "./views/company.js";
@@ -81,10 +81,15 @@ document.addEventListener("click", async (ev) => {
     downloadIcs(`shukatsu-${isoToday()}.ics`, items);
     return toast(`${items.length}件の予定を書き出しました`);
   }
+  if (t.matches("[data-add-ev], [data-add-prog], [data-remove-fs]")) t.closest("form")?.setAttribute("data-dirty", "");
   if (t.hasAttribute("data-add-ev")) {
-    const form = t.closest("form");
-    const c = bySlug(form.dataset.slug);
-    document.getElementById("events").insertAdjacentHTML("beforeend", eventFieldset({}, c?.programs || []));
+    // 選考ルートはフォームにいま並んでいるもの（追加したばかりで未保存のルートも選べるように）
+    const programs = [...t.closest("form").querySelectorAll("fieldset.pf")].map((fs) => ({
+      id: fs.dataset.pid,
+      kind: fs.querySelector('[name="kind"]').value,
+      title: fs.querySelector('[name="title"]').value.trim(),
+    }));
+    document.getElementById("events").insertAdjacentHTML("beforeend", eventFieldset({}, programs));
     document.querySelector("#events fieldset:last-child .ev-title-in").focus();
     return;
   }
@@ -111,7 +116,7 @@ document.addEventListener("click", async (ev) => {
     try {
       const sha = await writeFile(path, text, null, `${c.name} のノートを作成`);
       state.docCache.set(path, { text, sha });
-      state.docs.find((g) => g.dir === "notes").paths.push(path);
+      addDocPath("notes", path);
       location.hash = `#/doc/${encodeURIComponent(path)}/edit`;
     } catch (e) {
       toast(explain(e), true);
@@ -130,7 +135,7 @@ document.addEventListener("click", async (ev) => {
     try {
       const sha = await writeFile(path, text, null, `確定版: テーマ「${name}」を追加`);
       state.docCache.set(path, { text, sha });
-      state.docs.find((g) => g.dir === "profile").paths.push(path);
+      addDocPath("profile", path);
       location.hash = `#/docs/final/${encodeURIComponent(name)}`;
       toast("テーマを足しました。「話・種類・説明を直す」で、使う設問の種類を決めてください");
     } catch (e) {
@@ -155,6 +160,8 @@ document.addEventListener("click", async (ev) => {
     return;
   }
   if (t.id === "reload") {
+    if (isDirty() && !confirm(LEAVE)) return;
+    await idle(); // 保存の途中なら、終わってから読み直す
     state.docCache.clear();
     await Promise.all([loadCompanies(), loadDocList().catch(() => {})]);
     render();
@@ -170,6 +177,28 @@ document.addEventListener("click", async (ev) => {
     location.hash = "";
     location.reload();
   }
+});
+
+// 書きかけのまま別の画面へ移ると消えるので、確かめる
+const LEAVE = "書きかけの内容は保存されていません。破棄して移動しますか？";
+const markDirty = (ev) => {
+  const form = ev.target.closest?.("#view form");
+  if (form && !["login", "settings"].includes(form.id)) form.setAttribute("data-dirty", "");
+};
+document.addEventListener("input", markDirty);
+document.addEventListener("change", markDirty, true);
+document.addEventListener("click", (ev) => {
+  const a = ev.target.closest('a[href^="#"]');
+  if (!a || !isDirty() || a.getAttribute("href") === location.hash) return;
+  if (!confirm(LEAVE)) {
+    ev.preventDefault();
+    ev.stopImmediatePropagation();
+  } else {
+    document.querySelectorAll("#view form[data-dirty]").forEach((f) => f.removeAttribute("data-dirty"));
+  }
+}, true);
+window.addEventListener("beforeunload", (ev) => {
+  if (isDirty()) ev.preventDefault();
 });
 
 // ホームの件数から、そのタブを開いた企業一覧へ
@@ -194,9 +223,21 @@ document.addEventListener("change", (ev) => {
   }
 });
 
+// 送信中は書きかけの印を外す（保存して移動するときに確かめないように）。保存できずに同じ画面に残ったら戻す
 document.addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const form = ev.target;
+  const dirty = form.hasAttribute("data-dirty");
+  const hash = location.hash;
+  form.removeAttribute("data-dirty");
+  try {
+    await onSubmit(form);
+  } finally {
+    if (dirty && form.isConnected && location.hash === hash) form.setAttribute("data-dirty", "");
+  }
+});
+
+async function onSubmit(form) {
   const button = form.querySelector('[type="submit"]');
 
   // 企業ページで直接書くもの
@@ -217,13 +258,18 @@ document.addEventListener("submit", async (ev) => {
     const fd = new FormData(form);
     const token = String(fd.get("token") || "").trim();
     const repo = String(fd.get("repo") || cfg.repo).trim();
+    const prev = { token: cfg.token, repo: cfg.repo, companies: state.companies, sha: state.sha, loaded: state.loaded };
     if (token) cfg.token = token;
     cfg.repo = repo;
     button.disabled = true;
     state.error = null;
+    await idle();
     await loadCompanies();
     button.disabled = false;
     if (state.error) {
+      // つながらなかったら元の接続に戻す（違うリポジトリに古い内容を書き込まないように）
+      Object.assign(cfg, { token: prev.token, repo: prev.repo });
+      Object.assign(state, { companies: prev.companies, sha: prev.sha, loaded: prev.loaded });
       if (form.id === "login") {
         cfg.token = null;
         renderChrome();
@@ -231,11 +277,13 @@ document.addEventListener("submit", async (ev) => {
         state.error = null;
       } else {
         toast(state.error, true);
+        state.error = null;
       }
       return;
     }
     store.set("jh.token", cfg.token);
     store.set("jh.repo", cfg.repo);
+    if (repo !== prev.repo) state.docCache.clear();
     loadDocList().then(render).catch(() => {});
     location.hash = "#/home";
     render();
@@ -265,7 +313,7 @@ document.addEventListener("submit", async (ev) => {
       if (!c.salary) delete c.salary;
       if (!c.avgSalary) delete c.avgSalary;
       if (!c.priority) delete c.priority;
-    }, `${data.name} を${isNew ? "追加" : "更新"}`);
+    }, `${data.name} を${isNew ? "追加" : "更新"}`, { keepView: true });
     if (saved) location.hash = `#/c/${slug}`;
     button.disabled = false;
     return;
@@ -276,13 +324,15 @@ document.addEventListener("submit", async (ev) => {
     const e = readEvent(form.querySelector("fieldset.ev"));
     if (!c) return toast("企業を選んでください", true);
     if (!e.title || !e.date) return toast("内容と日付の両方を入れてください", true);
+    if (c.events.some((y) => y.title === e.title && y.date === e.date)) return toast("同じ日に同じ内容の予定がもうあります", true);
     const slug = c.slug;
     button.disabled = true;
     const saved = await commit(() => {
       const x = bySlug(slug);
       if (x && !x.events.some((y) => y.title === e.title && y.date === e.date)) x.events = [...x.events, { ...e }];
-    }, `${c.name}: 予定「${e.title}」を追加`);
-    if (saved) location.hash = `#/calendar/${e.date}`;
+    }, `${c.name}: 予定「${e.title}」を追加`, { keepView: true });
+    // 企業ページから来たら企業ページへ、カレンダーから来たらその日へ戻る
+    if (saved) location.hash = form.dataset.from === "company" ? `#/c/${slug}` : `#/calendar/${e.date}`;
     button.disabled = false;
     return;
   }
@@ -335,16 +385,23 @@ document.addEventListener("submit", async (ev) => {
       toast("保存しました");
       location.hash = path.startsWith(`${FINALS_DIR}/`) ? `#/docs/final/${encodeURIComponent(path.split("/").pop().replace(/\.md$/, ""))}` : `#/doc/${encodeURIComponent(path)}`;
     } catch (e) {
-      if (e.status === 409) {
+      if (e.status === 409 || e.status === 422) {
         state.docCache.delete(path);
         toast("別の端末で更新されていました。編集内容をコピーしてから、読み込み直してください。", true);
       } else toast(explain(e), true);
       button.disabled = false;
     }
   }
-});
+}
 
+// 戻るボタンなどで移るときも、書きかけがあれば確かめる（やめたら元の画面のまま）
+let lastHash = location.hash;
 window.addEventListener("hashchange", () => {
+  if (isDirty() && !confirm(LEAVE)) {
+    history.pushState(null, "", lastHash || "#/home");
+    return;
+  }
+  lastHash = location.hash;
   render();
   window.scrollTo(0, 0);
 });
