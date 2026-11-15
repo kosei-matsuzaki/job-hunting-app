@@ -38,7 +38,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 38px;
+  min-height: 40px;
   padding: 4px 12px;
   border: 1px solid var(--rule);
   border-radius: 8px;
@@ -215,16 +215,12 @@
 
 /* 予定: 残り日数の下に、カレンダーに追加する小さなアイコン */
 .ck-side { display: flex; flex: none; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 0.75rem; white-space: nowrap; }
-.cal-icons { display: flex; gap: 2px; }
-.ic { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--faint); font: inherit; font-size: 0.8125rem; font-weight: 900; text-decoration: none; cursor: pointer; }
-.ic:hover { background: var(--sheet-2); color: var(--ink); }
-.ic svg { width: 18px; height: 18px; }
 .result-box .result-form { margin-top: 8px; }
 .result-box.is-empty .hint { margin-bottom: 0; }
 
 /* ルートの中身: 状況（押すと変えられる）と、応募前なら受付状況 */
 .prog-state { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0 0 10px; }
-.state-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 2px 10px 2px 12px; border: 1.5px solid var(--ink); border-radius: 999px; background: var(--sheet); color: var(--ink); font: inherit; font-size: 0.8125rem; font-weight: 700; cursor: pointer; }
+.state-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 2px 10px 2px 12px; border: 1.5px solid var(--ink); border-radius: 999px; background: var(--sheet); color: var(--ink); font: inherit; font-size: 0.8125rem; font-weight: 700; cursor: pointer; }
 .state-btn span { color: var(--muted); font-size: 0.625rem; }
 .state-btn.todo { background: var(--ink); color: var(--paper); }
 .state-btn.todo span { color: inherit; }
@@ -289,8 +285,8 @@ main[data-view="c"] .card { margin-top: 28px; }
   display: inline-grid;
   flex: none;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   padding: 0;
   border: 1px solid transparent;
   border-radius: 50%;
@@ -298,14 +294,13 @@ main[data-view="c"] .card { margin-top: 28px; }
   color: var(--muted);
   cursor: pointer;
 }
-.ic-edit svg { width: 17px; height: 17px; }
+.ic-edit svg { width: 18px; height: 18px; }
 .ic-edit:hover { border-color: var(--rule); background: var(--sheet); color: var(--ink); }
-.sec > .ic-edit { margin-left: auto; align-self: center; margin-block: -6px; }
+.sec > .ic-edit { margin-left: auto; align-self: center; margin-block: -8px; }
 .sec-acts { display: flex; gap: 6px; margin-left: auto; align-self: center; }
 .co-hero > .ic-edit { margin-top: 2px; }
 .prog-state .ic-edit { margin-left: auto; }
-.rb-when .ic-edit { align-self: center; width: 30px; height: 30px; margin-left: 2px; }
-.checklist li > .ic-edit, .history li > .ic-edit { align-self: center; width: 30px; height: 30px; }
+.checklist li > .ic-edit, .history li > .ic-edit { align-self: center; }
 .checklist.ev-list li { gap: 6px; }
 .checklist.ev-list li > label { flex: 1; }
 .tl-head { margin: 16px 0 0; color: var(--muted); font-size: 0.75rem; font-weight: 700; }
@@ -326,14 +321,13 @@ main[data-view="c"] .card { margin-top: 28px; }
 .login-box.is-empty { padding: 0; border: 0; background: none; }
 .login-label { display: inline-flex; align-items: center; gap: 4px; margin-right: 4px; color: var(--muted); font-size: 0.75rem; font-weight: 700; }
 .login-label svg { width: 15px; height: 15px; }
-.login-box .qa { min-height: 34px; }
 .login-box > .ic-edit { margin-left: auto; }
 
 /* 編集・追加のモーダル */
 .modal .sheet-inner { overflow-y: auto; max-height: 88vh; }
 .modal-head { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 4px; }
 .modal-head .sheet-title { flex: 1; font-size: 1.0625rem; }
-.modal-x { flex: none; width: 36px; height: 36px; margin: -6px -6px 0 0; border: 0; border-radius: 50%; background: none; color: var(--muted); font-size: 1.5rem; line-height: 1; cursor: pointer; }
+.modal-x { flex: none; width: 40px; height: 40px; margin: -6px -6px 0 0; border: 0; border-radius: 50%; background: none; color: var(--muted); font-size: 1.5rem; line-height: 1; cursor: pointer; }
 .modal-x:hover { background: var(--sheet-2); color: var(--ink); }
 .modal input, .modal select, .modal textarea { background: var(--paper); }
 .modal fieldset.pf, .modal fieldset.ev { margin: 0; padding: 0; border: 0; background: none; }
@@ -353,17 +347,16 @@ main[data-view="c"] .card { margin-top: 28px; }
 .step-box.soon .rb-when em { color: var(--early); }
 .step-box.late .rb-when em { color: var(--faint); }
 .step-box .rb-when { flex-wrap: wrap; }
-.step-box.is-empty { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; border: 1px dashed var(--rule); font-size: 0.9375rem; }
-.step-box.is-empty .act { margin-left: auto; }
+.step-box.is-empty { border: 1px dashed var(--rule); font-size: 0.9375rem; }
 .step-tag { flex: none; padding: 0 5px; border-radius: 3px; background: var(--ink); color: var(--paper); font-size: 0.6875rem; font-weight: 700; line-height: 1.6; }
 .step-box.is-empty .step-tag { background: var(--sheet-2); color: var(--muted); }
 .step-box .rb-since { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sb-done { min-height: 30px; gap: 4px; padding: 2px 10px; align-self: center; }
+.sb-done { gap: 4px; padding: 2px 12px; }
 .sb-done svg { width: 15px; height: 15px; }
 .sb-more { margin: 8px 0 0; padding: 0; border-top: 1px dashed var(--rule); list-style: none; font-size: 0.8125rem; }
 .sb-more li { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
 .sb-more em { font-style: normal; font-weight: 700; white-space: nowrap; }
-.sb-more .ic-edit { width: 28px; height: 28px; }
+.sb-more .ic-edit { width: 36px; height: 36px; }
 
 /* 押印欄: 先の段階の締切の日付 */
 .st-dl { display: block; margin-top: 4px; color: var(--muted); font-family: var(--num); font-size: 0.75rem; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.2; }
@@ -372,3 +365,18 @@ main[data-view="c"] .card { margin-top: 28px; }
 /* ルートの状況の行: 鉛筆は1行目の右端に。受付の説明は下の行へ */
 .prog-state .ic-edit { order: 1; }
 .prog-state .prog-recruit { order: 2; flex-basis: 100%; }
+
+/* 締切・結果待ちの欄の上の行: 印・段階、右端に操作（済み・編集）。どの欄も操作は右上にそろえる */
+.box-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-height: 40px; font-size: 0.9375rem; font-weight: 700; }
+.box-head .rb-since { font-weight: 500; }
+.box-acts { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.box-title { margin: 0; color: var(--muted); font-size: 0.8125rem; line-height: 1.5; }
+.box-title .tag { margin-left: 6px; }
+.result-box, .step-box { padding: 6px 8px 10px 12px; }
+.rb-when { padding-right: 4px; }
+.ck-side { align-self: center; }
+
+/* ログインのまとまり: 鉛筆はいつも右上に固定（ID・PW が折り返しても1つだけ取り残されないように） */
+.login-box { position: relative; padding-right: 50px; min-height: 52px; }
+.login-box > .ic-edit { position: absolute; top: 50%; right: 5px; margin: 0; transform: translateY(-50%); }
+.login-box.is-empty { padding-right: 0; min-height: 0; }

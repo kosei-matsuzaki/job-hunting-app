@@ -11,9 +11,6 @@ export function viewSettings() {
       <label>GitHub トークン（変更するときだけ入力）<input name="token" type="password" autocomplete="off" placeholder="github_pat_…"></label>
       <button class="btn primary wide" type="submit">保存して読み込み直す</button>
     </form>
-    <h2 class="sec">カレンダーに書き出す</h2>
-    <p class="hint">これからの予定（済みを除く）を .ics ファイルにまとめます。iPhone は開くとカレンダーに追加でき、Googleカレンダーは PC の「設定 → インポート」から取り込めます。締切は前日、日程は2時間前に通知が出ます。</p>
-    <button class="btn wide" data-ics-all>まとめて書き出す</button>
     <h2 class="sec">この端末から消す</h2>
     <p class="hint">トークンと、端末に残っている企業データ・素材の控えを削除します。</p>
     <button class="btn danger wide" data-logout>この端末からログアウト</button>`;

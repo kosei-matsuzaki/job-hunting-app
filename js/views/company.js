@@ -5,7 +5,6 @@
 import { ENDED, KIND_CLASS, KIND_SHORT, PRIORITY_LABEL, STATE_GROUPS, STATES } from "../config.js";
 import { hasNote } from "../data.js";
 import { addDays, daysUntil, evRemain, evWhen, fmtDate, isoOf, remainText, today } from "../dates.js";
-import { googleCalUrl } from "../ics.js";
 import { esc, renderMarkdown } from "../md.js";
 import { bySlug, byWhen, defaultProgram, flowIndex, hasLogin, isWaiting, programOf, resultEvent, stepEvents, stepOf } from "../model.js";
 import { avatar, ICONS, kindBadge, progRow, sortPrograms, statePill } from "../parts.js";
@@ -21,14 +20,10 @@ const routeTag = (c, e) => {
   return p ? `<span class="tag prog">${esc(KIND_SHORT[p.kind] || p.kind)}</span>` : "";
 };
 
-// これからの予定の1行: 日付（締切・期間・結果の言い方で）｜内容｜残りとカレンダーに追加
+// これからの予定の1行: 日付（締切・期間・結果の言い方で）｜内容｜残り日数と編集
 function evItem(c, e) {
   const w = evWhen(e);
   const r = evRemain(e);
-  const add = r.cls === "late" ? "" : `<span class="cal-icons">
-      <button class="ic" data-ics="${esc(c.slug)}:${e.i}" title="カレンダーに追加（.ics）" aria-label="${esc(e.title)} をカレンダーに追加">${ICONS.calAdd}</button>
-      <a class="ic g" href="${esc(googleCalUrl(e, c))}" target="_blank" rel="noopener noreferrer" title="Googleカレンダーに追加" aria-label="${esc(e.title)} をGoogleカレンダーに追加">G</a>
-    </span>`;
   return `
     <li class="ev-${esc(e.kind || "deadline")}">
       <label><input type="checkbox" data-toggle="${esc(c.slug)}:${e.i}" aria-label="${esc(e.title)} を済みにする">
@@ -37,12 +32,13 @@ function evItem(c, e) {
         <span class="ck-title">${routeTag(c, e)}${esc(e.title)}</span>
         ${w.sub ? `<span class="ck-sub">${esc(w.sub)}</span>` : ""}
       </span></label>
-      <span class="ck-side"><span class="${r.cls}">${esc(r.text)}</span>${add}</span>
+      <span class="ck-side ${r.cls}">${esc(r.text)}</span>
       ${editBtn(`ev:${esc(c.slug)}:${e.i}`, `${esc(e.title)} を編集`)}
     </li>`;
 }
 
-// 結果待ちのとき: いつ頃結果が出るか。受けた日から連絡の予定日までを帯で見せる
+// 結果待ちのとき: いつ頃結果が出るか。受けた日から連絡の予定日までを帯で見せる。
+// 上の行に印と段階、右端に操作（予定日の編集）。その下に日付を大きく、右に残り日数
 function resultBox(c, p) {
   const r = resultEvent(c, p.id);
   const key = `${esc(c.slug)}:${esc(p.id)}`;
@@ -50,7 +46,7 @@ function resultBox(c, p) {
   const since = p.waitingSince ? `<span class="rb-since">${esc(fmtDate(p.waitingSince))}に受けた</span>` : "";
   if (!r) {
     return `<div class="result-box is-empty">
-      <p class="result-head"><span class="cp-wait">結果待ち</span><b>${step}</b>${since}</p>
+      <div class="box-head"><span class="cp-wait">結果待ち</span><b>${step}</b>${since}</div>
       <p class="rb-ask">結果はいつ頃？</p>
       <div class="rb-quick">${[[7, "1週間後"], [14, "2週間後"], [30, "1か月後"]]
         .map(([d, l]) => `<button class="mini" data-result-in="${key}:${d}">${l}<small>${esc(fmtDate(isoOf(addDays(today(), d))))}</small></button>`)
@@ -63,31 +59,32 @@ function resultBox(c, p) {
   const from = p.waitingSince && p.waitingSince < r.date ? p.waitingSince : null;
   const pct = from ? Math.max(0, Math.min(100, Math.round((-daysUntil(from) / (daysUntil(r.date) - daysUntil(from))) * 100))) : null;
   return `<div class="result-box ${rm.cls}">
-    <p class="result-head"><span class="cp-wait">結果待ち</span><b>${step}</b>${since}</p>
-    <div class="rb-when"><span class="rb-date">${esc(fmtDate(r.date))}</span><span class="rb-by">までに連絡</span><em>${esc(n < 0 ? "予定日を過ぎた" : remainText(n))}</em>${editBtn(`result:${key}`, "予定日を変える")}</div>
+    <div class="box-head"><span class="cp-wait">結果待ち</span><b>${step}</b>${since}<span class="box-acts">${editBtn(`result:${key}`, "予定日を変える")}</span></div>
+    <div class="rb-when"><span class="rb-date">${esc(fmtDate(r.date))}</span><span class="rb-by">までに連絡</span><em>${esc(n < 0 ? "予定日を過ぎた" : remainText(n))}</em></div>
     ${pct != null ? `<div class="rb-bar" role="img" aria-label="予定日まで${pct}%"><i style="width:${pct}%"></i></div>` : ""}
     ${n < 0 ? '<p class="hint">予定日を過ぎました。連絡を確かめて、下のボタンで記録してください。</p>' : ""}
   </div>`;
 }
 
-// いまの段階の締切（日程）。結果待ちの欄と同じ形で、日付を大きく、残り日数と編集。複数の回があれば下に並べる
+// いまの段階の締切（日程）。結果待ちの欄と同じ形: 上の行に印と段階、右端に「済み」と編集。
+// その下に予定の名前、日付を大きく、右に残り日数。複数の回があれば下に並べる
 function stepBox(c, p, i) {
   const step = p.flow[i];
   const key = `${esc(c.slug)}:${esc(p.id)}`;
   const evs = stepEvents(c, p, i);
   if (!evs.length) {
-    return `<div class="step-box is-empty"><span class="step-tag">締切</span><b>${esc(step)}</b>
-      ${addBtn(`ev:${key.replace(":", ":new~")}~${i}`, "締切を入れる")}</div>`;
+    return `<div class="step-box is-empty"><div class="box-head"><span class="step-tag">締切</span><b>${esc(step)}</b>
+      <span class="box-acts">${addBtn(`ev:${key.replace(":", ":new~")}~${i}`, "締切を入れる")}</span></div></div>`;
   }
   const [e, ...more] = evs;
   const rm = evRemain(e);
   const w = evWhen(e);
   const label = e.kind === "event" ? "日程" : "締切";
   return `<div class="step-box ${rm.cls}">
-    <p class="result-head"><span class="step-tag">${label}</span><b>${esc(step)}</b><span class="rb-since">${esc(e.title)}</span></p>
-    <div class="rb-when"><span class="rb-date">${esc(fmtDate(e.date))}</span><span class="rb-by">${esc(w.main.replace(fmtDate(e.date), "").trim())}</span>${e.tentative ? '<span class="tag tentative">目安</span>' : ""}<em>${esc(rm.text)}</em>
-      ${rm.cls === "late" ? "" : `<span class="cal-icons"><button class="ic" data-ics="${esc(c.slug)}:${e.i}" title="カレンダーに追加（.ics）" aria-label="${esc(e.title)} をカレンダーに追加">${ICONS.calAdd}</button><a class="ic g" href="${esc(googleCalUrl(e, c))}" target="_blank" rel="noopener noreferrer" title="Googleカレンダーに追加" aria-label="${esc(e.title)} をGoogleカレンダーに追加">G</a></span>`}
-      <button class="mini sb-done" data-done="${esc(c.slug)}:${e.i}" aria-label="${esc(e.title)} を済みにする">${ICONS.check}済み</button>${editBtn(`ev:${esc(c.slug)}:${e.i}`, `${esc(e.title)} を編集`)}</div>
+    <div class="box-head"><span class="step-tag">${label}</span><b>${esc(step)}</b>
+      <span class="box-acts"><button class="mini sb-done" data-done="${esc(c.slug)}:${e.i}" aria-label="${esc(e.title)} を済みにする">${ICONS.check}済み</button>${editBtn(`ev:${esc(c.slug)}:${e.i}`, `${esc(e.title)} を編集`)}</span></div>
+    <p class="box-title">${esc(e.title)}${e.tentative ? '<span class="tag tentative">目安</span>' : ""}</p>
+    <div class="rb-when"><span class="rb-date">${esc(fmtDate(e.date))}</span><span class="rb-by">${esc(w.main.replace(fmtDate(e.date), "").trim())}</span><em>${esc(rm.text)}</em></div>
     ${w.sub ? `<p class="hint">${esc(w.sub)}</p>` : ""}
     ${more.length ? `<ul class="sb-more">${more.map((x) => `<li><span class="h-date">${esc(fmtDate(x.date))}</span><span class="tl-body">${esc(x.title)}</span><em class="${evRemain(x).cls}">${esc(evRemain(x).text)}</em>${editBtn(`ev:${esc(c.slug)}:${x.i}`, `${esc(x.title)} を編集`)}</li>`).join("")}</ul>` : ""}
   </div>`;

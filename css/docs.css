@@ -51,7 +51,7 @@
 .ref > summary small { color: var(--muted); font-size: 0.75rem; font-weight: 500; }
 .ref > .md { padding: 0 0 8px 12px; border-left: 2px solid var(--rule); font-size: 0.9375rem; }
 .tag.ai { background: none; border: 1px solid var(--ai); color: var(--ai); }
-.sec-fix { min-height: 28px; padding: 0 9px; border-style: dashed; color: var(--muted); font-size: 0.75rem; }
+.sec-fix { min-height: 32px; padding: 0 10px; border-style: dashed; color: var(--muted); font-size: 0.75rem; }
 .sec-head.plain:has(h4, h5, h6) { border-bottom: 0; padding-bottom: 0; margin: 22px 0 6px; }
 .doc-text.is-section { min-height: 45vh; }
 

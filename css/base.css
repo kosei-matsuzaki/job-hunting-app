@@ -228,7 +228,7 @@ main { max-width: 680px; margin: 0 auto; padding: 4px var(--gutter) 0; }
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  min-height: 32px;
+  min-height: 36px;
   padding: 3px 12px 3px 10px;
   border: 1px solid var(--rule);
   border-radius: 999px;
@@ -313,7 +313,7 @@ main { max-width: 680px; margin: 0 auto; padding: 4px var(--gutter) 0; }
 /* 朱は締切と内定の印にだけ使うので、削除・不合格などは墨の控えめな実線にする（確認のダイアログが出る） */
 .btn.danger, .btn.quiet { border-color: var(--rule); background: transparent; color: var(--muted); }
 .btn.danger:hover, .btn.quiet:hover { border-color: var(--ink); background: transparent; color: var(--ink); }
-.btn.small { min-height: 34px; padding: 4px 12px; border-radius: 7px; font-size: 0.8125rem; }
+.btn.small { min-height: 36px; padding: 4px 12px; border-radius: 7px; font-size: 0.8125rem; }
 .btn.wide { display: flex; width: 100%; margin: 10px 0; }
 .btn:disabled { opacity: 0.5; cursor: wait; }
 
@@ -321,7 +321,7 @@ main { max-width: 680px; margin: 0 auto; padding: 4px var(--gutter) 0; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 34px;
+  min-height: 36px;
   padding: 2px 12px;
   border: 1px solid var(--rule);
   border-radius: 7px;

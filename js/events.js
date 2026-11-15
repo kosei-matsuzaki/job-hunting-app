@@ -3,11 +3,10 @@
 import { addRecord, addTodo, finishTodo, markDone, markWaiting, saveMypage, setResultDate, statusClick, undoable } from "./actions.js";
 import { DEFAULT_FLOW, FINALS_DIR, PRIORITY_LABEL } from "./config.js";
 import { addDocPath, commit, DOC_KEY, idle, loadCompanies, loadDocList, newId, normalize, saveDoc } from "./data.js";
-import { addDays, daysUntil, isoOf, isoToday, today } from "./dates.js";
+import { addDays, isoOf, isoToday, today } from "./dates.js";
 import { explain, writeFile } from "./github.js";
-import { downloadIcs } from "./ics.js";
 import { esc } from "./md.js";
-import { bySlug, liveEvents, programOf } from "./model.js";
+import { bySlug, programOf } from "./model.js";
 import { $view, isDirty, render, renderChrome } from "./render.js";
 import { cfg, state, store, ui } from "./store.js";
 import { copy, takeToastAction, toast } from "./toast.js";
@@ -89,18 +88,6 @@ document.addEventListener("click", async (ev) => {
     t.textContent = shown ? "••••••" : t.dataset.reveal;
     t.classList.toggle("shown", !shown);
     return;
-  }
-  if (t.dataset.ics) {
-    const [slug, i] = t.dataset.ics.split(":");
-    const c = bySlug(slug);
-    const e = c.events[Number(i)];
-    return downloadIcs(`${c.slug}-${e.date}.ics`, [{ e, c }]);
-  }
-  if (t.hasAttribute("data-ics-all")) {
-    const items = liveEvents().filter((e) => daysUntil(e.date) >= 0).map((e) => ({ e, c: e.c }));
-    if (!items.length) return toast("書き出す予定がありません", true);
-    downloadIcs(`shukatsu-${isoToday()}.ics`, items);
-    return toast(`${items.length}件の予定を書き出しました`);
   }
   if (t.matches("[data-add-ev], [data-add-prog], [data-remove-fs]")) t.closest("form")?.setAttribute("data-dirty", "");
   if (t.hasAttribute("data-add-ev")) {

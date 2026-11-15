@@ -124,8 +124,8 @@
 .tick {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   padding: 0;
   border: 1.5px solid var(--faint);
   border-radius: 6px;
@@ -218,7 +218,7 @@
 .co-item > .co-next { margin: -6px 0 0; padding: 0 0 12px 52px; }
 
 /* 企業一覧のログイン: 名前の行の右に、小さなアイコンで */
-.lg-btn { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; }
+.lg-btn { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; }
 .lg-btn:hover { background: var(--sheet-2); color: var(--ink); }
 .lg-btn svg { width: 19px; height: 19px; }
 
