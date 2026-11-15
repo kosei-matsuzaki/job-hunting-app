@@ -11,6 +11,10 @@ import { bySlug, byWhen, defaultProgram, flowIndex, hasLogin, isWaiting, program
 import { avatar, ICONS, kindBadge, progRow, sortPrograms, statePill } from "../parts.js";
 import { state } from "../store.js";
 
+// 箇所ごとの編集（鉛筆）と追加（＋）のボタン。押すとその箇所だけのモーダルが開く
+const editBtn = (spec, label) => `<button class="ic-edit" data-modal="${spec}" title="${label}" aria-label="${label}">${ICONS.edit}</button>`;
+const addBtn = (spec, label) => `<button class="act" data-modal="${spec}">${ICONS.plus}${label}</button>`;
+
 // 予定にルートの種類を添える（ルートが複数あるときだけ）
 const routeTag = (c, e) => {
   const p = c.programs.length > 1 && programOf(c, e.program);
@@ -34,6 +38,7 @@ function evItem(c, e) {
         ${w.sub ? `<span class="ck-sub">${esc(w.sub)}</span>` : ""}
       </span></label>
       <span class="ck-side"><span class="${r.cls}">${esc(r.text)}</span>${add}</span>
+      ${editBtn(`ev:${esc(c.slug)}:${e.i}`, `${esc(e.title)} を編集`)}
     </li>`;
 }
 
@@ -42,10 +47,6 @@ function resultBox(c, p) {
   const r = resultEvent(c, p.id);
   const key = `${esc(c.slug)}:${esc(p.id)}`;
   const step = esc(p.step || p.flow[0] || "選考");
-  const form = (label) => `<form class="result-form" data-result="${key}">
-      <input type="date" name="date" required min="${isoOf(addDays(today(), -30))}" value="${esc(r?.date || "")}" aria-label="結果の連絡の予定日">
-      <button class="btn small${r ? "" : " primary"}" type="submit">${label}</button>
-    </form>`;
   const since = p.waitingSince ? `<span class="rb-since">${esc(fmtDate(p.waitingSince))}に受けた</span>` : "";
   if (!r) {
     return `<div class="result-box is-empty">
@@ -53,8 +54,7 @@ function resultBox(c, p) {
       <p class="rb-ask">結果はいつ頃？</p>
       <div class="rb-quick">${[[7, "1週間後"], [14, "2週間後"], [30, "1か月後"]]
         .map(([d, l]) => `<button class="mini" data-result-in="${key}:${d}">${l}<small>${esc(fmtDate(isoOf(addDays(today(), d))))}</small></button>`)
-        .join("")}</div>
-      ${form("この日")}
+        .join("")}<button class="mini" data-modal="result:${key}">${ICONS.cal}日付を選ぶ</button></div>
     </div>`;
   }
   const n = daysUntil(r.date);
@@ -64,10 +64,9 @@ function resultBox(c, p) {
   const pct = from ? Math.max(0, Math.min(100, Math.round((-daysUntil(from) / (daysUntil(r.date) - daysUntil(from))) * 100))) : null;
   return `<div class="result-box ${rm.cls}">
     <p class="result-head"><span class="cp-wait">結果待ち</span><b>${step}</b>${since}</p>
-    <div class="rb-when"><span class="rb-date">${esc(fmtDate(r.date))}</span><span class="rb-by">までに連絡</span><em>${esc(n < 0 ? "予定日を過ぎた" : remainText(n))}</em></div>
+    <div class="rb-when"><span class="rb-date">${esc(fmtDate(r.date))}</span><span class="rb-by">までに連絡</span><em>${esc(n < 0 ? "予定日を過ぎた" : remainText(n))}</em>${editBtn(`result:${key}`, "予定日を変える")}</div>
     ${pct != null ? `<div class="rb-bar" role="img" aria-label="予定日まで${pct}%"><i style="width:${pct}%"></i></div>` : ""}
     ${n < 0 ? '<p class="hint">予定日を過ぎました。連絡を確かめて、下のボタンで記録してください。</p>' : ""}
-    <details class="result-edit"><summary>予定日を変える</summary>${form("変える")}</details>
   </div>`;
 }
 
@@ -85,10 +84,11 @@ function programPanel(c, p, { inList = false } = {}) {
   let html = `<section class="prog-panel${inList ? " in-list" : ""} ${KIND_CLASS[p.kind] || "main"}">`;
   if (!inList) html += `<div class="prog-head">${kindBadge(p.kind)}<h2 class="prog-title">${esc(p.title || p.kind)}</h2></div>`;
 
-  // 状況（押すと選べる）。応募前なら受付状況もここに
+  // 状況（押すと選べる）。応募前なら受付状況もここに。右端にこのルートの編集
   html += `<div class="prog-state">
       <button class="state-btn ${s}" data-sheet="${key}" aria-haspopup="dialog" aria-label="状況を変える（いまは${esc(STATES[s].label)}）">${esc(STATES[s].label)}<span aria-hidden="true">▾</span></button>
       ${s === "plan" && recruit ? `<span class="prog-recruit">${recruit}</span>` : ""}
+      ${editBtn(`prog:${key}`, "この選考ルートを編集")}
     </div>`;
 
   if (p.flow.length) {
@@ -169,18 +169,11 @@ export function openSheet(key) {
   dlg.showModal();
 }
 
-// 上のボタンの列: 採用ページ・開いているルートの募集ページとエントリー・マイページ・ID・PW。
-// ID は見せたまま押すとコピー、パスワードは伏せたまま押すとコピー
+// 上: 調べたリンクの列（採用ページ・開いているルートの募集ページとエントリー）と、
+// その下にログインのまとまり（マイページ・ID・PW と、その編集）。ID は見せたまま、パスワードは伏せたまま押すとコピー
 function linkBar(c, p) {
   const m = c.mypage;
-  const form = `<form class="mp-form" data-mypage="${esc(c.slug)}">
-      <label>マイページのURL<input type="url" name="url" value="${esc(m.url)}" autocapitalize="off"></label>
-      <div class="pf-row">
-        <label>ID<input name="id" value="${esc(m.id)}" autocapitalize="off" autocomplete="off"></label>
-        <label>パスワード<input name="password" value="${esc(m.password)}" autocapitalize="off" autocomplete="off"></label>
-      </div>
-      <button class="btn primary small" type="submit">保存する</button>
-    </form>`;
+  const slugE = esc(c.slug);
   const ext = (url, icon, label, sub = "") => `<a class="qa" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${icon}<span>${label}</span>${sub ? `<small>${esc(sub)}</small>` : ""}</a>`;
   // ルートが複数あるときは、どのルートのリンクか添える
   const which = p && c.programs.length > 1 ? KIND_SHORT[p.kind] || p.kind : "";
@@ -188,17 +181,15 @@ function linkBar(c, p) {
   const route = p ? [[p.url, ICONS.globe, "募集ページ"], [p.entryUrl, ICONS.door, "エントリー"]]
     .filter(([u]) => u && !seen.has(u) && seen.add(u))
     .map(([u, i, l]) => ext(u, i, l, which)) : [];
-  const chips = [
-    c.recruitUrl && ext(c.recruitUrl, ICONS.globe, "採用ページ"),
-    ...route,
-    m.url && ext(m.url, ICONS.door, "マイページ"),
-    m.id && `<button class="qa cred-chip" data-copy="${esc(m.id)}" data-copy-label="ID" title="IDをコピー" aria-label="IDをコピー"><small>ID</small><code>${esc(m.id)}</code>${ICONS.copy}</button>`,
-    m.password && `<button class="qa cred-chip" data-copy="${esc(m.password)}" data-copy-label="パスワード" title="パスワードをコピー" aria-label="パスワードをコピー"><small>PW</small><code>••••••</code>${ICONS.copy}</button>`,
-  ].filter(Boolean).join("");
-  const has = hasLogin(c);
-  return `<section class="login-card">
-    <div class="quick">${chips}<details class="mp-edit"><summary class="qa ${has ? "" : "muted"}">${has ? `${ICONS.edit}<span>ログインを変更</span>` : `${ICONS.key}<span>マイページを登録</span>`}</summary>${form}</details></div>
-  </section>`;
+  const links = [c.recruitUrl && ext(c.recruitUrl, ICONS.globe, "採用ページ"), ...route].filter(Boolean).join("");
+  const login = hasLogin(c)
+    ? `<div class="login-box"><span class="login-label">${ICONS.key}ログイン</span>
+        ${m.url ? ext(m.url, ICONS.door, "マイページ") : ""}
+        ${m.id ? `<button class="qa cred-chip" data-copy="${esc(m.id)}" data-copy-label="ID" title="IDをコピー" aria-label="IDをコピー"><small>ID</small><code>${esc(m.id)}</code>${ICONS.copy}</button>` : ""}
+        ${m.password ? `<button class="qa cred-chip" data-copy="${esc(m.password)}" data-copy-label="パスワード" title="パスワードをコピー" aria-label="パスワードをコピー"><small>PW</small><code>••••••</code>${ICONS.copy}</button>` : ""}
+        ${editBtn(`login:${slugE}`, "ログイン情報を編集")}</div>`
+    : `<div class="login-box is-empty">${addBtn(`login:${slugE}`, "マイページのログインを登録")}</div>`;
+  return `<section class="login-card">${links ? `<div class="quick">${links}</div>` : ""}${login}</section>`;
 }
 
 // これからの予定は近いものだけ見せ、残りは畳む
@@ -216,18 +207,16 @@ function timeline(c, p) {
     ...all.filter((e) => e.done).map((e) => ({ date: e.date, ev: e })),
     ...c.history.map((h) => ({ date: h.date, text: h.text })),
   ].sort((a, b) => b.date.localeCompare(a.date) || (a.ev ? 1 : 0) - (b.ev ? 1 : 0));
-  const addHref = `#/add?c=${slugE}${p ? `&p=${esc(p.id)}` : ""}`;
   const pastItem = (x) => x.ev
     ? `<li class="tl-ev"><span class="h-date">${esc(fmtDate(x.date))}</span><span class="tl-body"><span class="tl-done">済</span>${routeTag(c, x.ev)}${esc(x.ev.title)}</span>
-        <label class="tl-undo" title="済みを取り消す"><input type="checkbox" checked data-toggle="${slugE}:${x.ev.i}" aria-label="${esc(x.ev.title)} を未完了に戻す"></label></li>`
+        <label class="tl-undo" title="済みを取り消す"><input type="checkbox" checked data-toggle="${slugE}:${x.ev.i}" aria-label="${esc(x.ev.title)} を未完了に戻す"></label>${editBtn(`ev:${slugE}:${x.ev.i}`, `${esc(x.ev.title)} を編集`)}</li>`
     : `<li><span class="h-date">${esc(fmtDate(x.date))}</span><span class="tl-body">${esc(x.text)}</span></li>`;
   const head = past.slice(0, 20);
   const rest = past.slice(20);
-  return `<section class="card timeline"><h2 class="sec">予定と記録<a class="act" href="${addHref}">${ICONS.plus}予定を追加</a></h2>
+  return `<section class="card timeline"><h2 class="sec">予定と記録<span class="sec-acts">${addBtn(`ev:${slugE}:new-${p ? esc(p.id) : ""}`, "予定")}${addBtn(`record:${slugE}`, "記録")}</span></h2>
     ${open.length ? `<ul class="checklist ev-list">${open.slice(0, SOON).map((e) => evItem(c, e)).join("")}</ul>` : `<p class="hint">これからの予定はありません。</p>`}
     ${open.length > SOON ? `<details class="tl-more"><summary>その先の予定<span class="count">${open.length - SOON}</span></summary><ul class="checklist ev-list">${open.slice(SOON).map((e) => evItem(c, e)).join("")}</ul></details>` : ""}
-    <form class="inline-add tl-add" data-record="${slugE}"><input name="text" placeholder="記録を書く（例: 面接の手応え、連絡が来た）" aria-label="記録を書く" required><button class="mini" type="submit">書く</button></form>
-    ${past.length ? `<ol class="history">${head.map(pastItem).join("")}</ol>` : ""}
+    ${past.length ? `<h3 class="tl-head">これまで</h3><ol class="history">${head.map(pastItem).join("")}</ol>` : ""}
     ${rest.length ? `<details class="tl-more"><summary>それより前<span class="count">${rest.length}</span></summary><ol class="history">${rest.map(pastItem).join("")}</ol></details>` : ""}
   </section>`;
 }
@@ -253,20 +242,20 @@ export function viewCompany(slug, pid) {
           <span class="stars-label">${esc(PRIORITY_LABEL[c.priority] || "志望度")}</span>
         </div>
       </div>
-      <a class="act" href="#/c/${slugE}/edit">${ICONS.edit}編集</a>
+      ${editBtn(`basic:${slugE}`, "基本情報を編集")}
     </header>
     ${linkBar(c, p)}`;
 
   // 選考ルートが複数あれば1行ずつ並べ、選んだルートの中身をその下に開く
+  html += `<h2 class="sec">選考ルート${c.programs.length > 1 ? `<span class="count">${c.programs.length}</span>` : ""}${addBtn(`prog:${slugE}:`, "ルート")}</h2>`;
   if (c.programs.length > 1) {
-    html += `<h2 class="sec">選考ルート<span class="count">${c.programs.length}</span></h2>
-      <ol class="prog-list">${sortPrograms(c)
+    html += `<ol class="prog-list">${sortPrograms(c)
         .map((q) => `<li class="${q.id === p.id ? "is-open" : ""}">${progRow(c, q, { current: q.id === p.id })}${q.id === p.id ? programPanel(c, q, { inList: true }) : ""}</li>`)
         .join("")}</ol>`;
   } else {
     html += p
       ? programPanel(c, p)
-      : `<section class="empty-panel">選考ルート（本選考・インターンなど）が登録されていません。<a class="act" href="#/c/${slugE}/edit">${ICONS.edit}編集から追加</a></section>`;
+      : `<section class="empty-panel">選考ルート（本選考・インターンなど）が登録されていません。${addBtn(`prog:${slugE}:`, "ルートを追加")}</section>`;
   }
 
   html += timeline(c, p);
@@ -277,15 +266,14 @@ export function viewCompany(slug, pid) {
     ? `<a class="btn wide" href="#/doc/${encodeURIComponent(`notes/${c.slug}.md`)}">${ICONS.doc}ノートを開く</a>`
     : state.docs ? `<button class="btn ghost wide" data-newnote="${slugE}">${ICONS.plus}ノートを作る</button>` : `<p class="hint">読み込み中…</p>`}</section>`;
 
-  html += `<section class="card"><h2 class="sec">メモ<a class="act" href="#/c/${slugE}/edit">${ICONS.edit}編集</a></h2>${
+  html += `<section class="card"><h2 class="sec">メモ${editBtn(`memo:${slugE}`, "メモを編集")}</h2>${
     c.memo?.trim() ? `<div class="md">${renderMarkdown(c.memo)}</div>` : `<p class="hint">調べたことや出典はここに。</p>`}</section>`;
 
   // やること: 済んだらチェックで消える
-  html += `<section class="card"><h2 class="sec">やること${c.todo.length ? `<span class="count">${c.todo.length}</span>` : ""}</h2>
+  html += `<section class="card"><h2 class="sec">やること${c.todo.length ? `<span class="count">${c.todo.length}</span>` : ""}${addBtn(`todo:${slugE}`, "やること")}</h2>
     ${c.todo.length ? `<ul class="checklist todo-list">${c.todo
       .map((t) => `<li><label><input type="checkbox" data-todo-done="${slugE}" value="${esc(t)}"><span class="ck-body"><span class="ck-title">${esc(t)}</span></span></label></li>`)
-      .join("")}</ul>` : ""}
-    <form class="inline-add" data-todo="${slugE}"><input name="text" placeholder="調べること・転記することなど" aria-label="やることを追加" required><button class="mini" type="submit">追加</button></form>
+      .join("")}</ul>` : `<p class="hint">調べること・転記することなど。済んだらチェックで消えます。</p>`}
   </section>`;
   return html;
 }

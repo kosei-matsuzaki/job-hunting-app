@@ -12,6 +12,7 @@ import { $view, isDirty, render, renderChrome } from "./render.js";
 import { cfg, state, store, ui } from "./store.js";
 import { copy, takeToastAction, toast } from "./toast.js";
 import { openSheet } from "./views/company.js";
+import { closeModal, deleteFromModal, openModal, submitModal } from "./views/modals.js";
 import { docName, replaceSection } from "./views/docs.js";
 import { finalPath, finalPaths, newFinalText, parseFinal, removeVersion, setVersion } from "./finals.js";
 import { eventFieldset, programFieldset, readEvent, readForm } from "./views/edit.js";
@@ -44,6 +45,8 @@ document.addEventListener("click", async (ev) => {
     return setResultDate(slug, pid, isoOf(addDays(today(), Number(days))));
   }
   if (t.dataset.sheet) return openSheet(t.dataset.sheet);
+  if (t.dataset.modal) return openModal(t.dataset.modal);
+  if (t.dataset.delProg || t.dataset.delEv) return deleteFromModal(t);
   if (t.dataset.ctab) {
     ui.ctab = t.dataset.ctab;
     ui.cq = "";
@@ -107,6 +110,7 @@ document.addEventListener("click", async (ev) => {
   if (t.dataset.delete) {
     const c = bySlug(t.dataset.delete);
     if (!confirm(`${c.name} を削除します。予定・ログイン情報・メモも消えます。`)) return;
+    closeModal();
     const slug = c.slug;
     if (await commit(() => { state.companies = state.companies.filter((x) => x.slug !== slug); }, `${c.name} を削除`)) {
       location.hash = "#/companies";
@@ -248,6 +252,10 @@ document.addEventListener("submit", async (ev) => {
 async function onSubmit(form) {
   const button = form.querySelector('[type="submit"]');
 
+  // 企業ページのモーダル: 送ったら閉じる
+  if (form.dataset.m) return submitModal(form);
+  if (form.closest("#modal")) closeModal();
+
   // 企業ページで直接書くもの
   if (form.dataset.mypage) {
     const fd = new FormData(form);
@@ -263,7 +271,7 @@ async function onSubmit(form) {
     const text = form.text.value.trim();
     if (!text) return;
     button.disabled = true;
-    await (form.dataset.todo ? addTodo(form.dataset.todo, text) : addRecord(form.dataset.record, text));
+    await (form.dataset.todo ? addTodo(form.dataset.todo, text) : addRecord(form.dataset.record, text, form.date?.value || undefined));
     return;
   }
 

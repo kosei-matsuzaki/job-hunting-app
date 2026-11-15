@@ -283,3 +283,65 @@
 main[data-view="c"] { max-width: 820px; }
 main[data-view="c"] .card { margin-top: 28px; }
 .co-hero .act { flex: none; }
+
+/* 箇所ごとの編集（鉛筆だけの小さなボタン）。押すとその箇所だけのモーダル */
+.ic-edit {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.ic-edit svg { width: 17px; height: 17px; }
+.ic-edit:hover { border-color: var(--rule); background: var(--sheet); color: var(--ink); }
+.sec > .ic-edit { margin-left: auto; align-self: center; margin-block: -6px; }
+.sec-acts { display: flex; gap: 6px; margin-left: auto; align-self: center; }
+.co-hero > .ic-edit { margin-top: 2px; }
+.prog-state .ic-edit { margin-left: auto; }
+.rb-when .ic-edit { align-self: center; width: 30px; height: 30px; margin-left: 2px; }
+.checklist li > .ic-edit, .history li > .ic-edit { align-self: center; width: 30px; height: 30px; }
+.checklist.ev-list li { gap: 6px; }
+.checklist.ev-list li > label { flex: 1; }
+.tl-head { margin: 16px 0 0; color: var(--muted); font-size: 0.75rem; font-weight: 700; }
+.timeline .history { margin-top: 2px; }
+
+/* ログインのまとまり: リンクの列とは別の、薄い枠の1行 */
+.login-card { display: grid; gap: 8px; }
+.login-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 6px 6px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--sheet-2);
+}
+.login-box.is-empty { padding: 0; border: 0; background: none; }
+.login-label { display: inline-flex; align-items: center; gap: 4px; margin-right: 4px; color: var(--muted); font-size: 0.75rem; font-weight: 700; }
+.login-label svg { width: 15px; height: 15px; }
+.login-box .qa { min-height: 34px; }
+.login-box > .ic-edit { margin-left: auto; }
+
+/* 編集・追加のモーダル */
+.modal .sheet-inner { overflow-y: auto; max-height: 88vh; }
+.modal-head { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 4px; }
+.modal-head .sheet-title { flex: 1; font-size: 1.0625rem; }
+.modal-x { flex: none; width: 36px; height: 36px; margin: -6px -6px 0 0; border: 0; border-radius: 50%; background: none; color: var(--muted); font-size: 1.5rem; line-height: 1; cursor: pointer; }
+.modal-x:hover { background: var(--sheet-2); color: var(--ink); }
+.modal input, .modal select, .modal textarea { background: var(--paper); }
+.modal fieldset.pf, .modal fieldset.ev { margin: 0; padding: 0; border: 0; background: none; }
+.modal-actions { display: flex; gap: 8px; margin-top: 18px; }
+.modal-actions .btn { flex: 1; }
+.modal-del { margin-top: 18px !important; }
+/* 狭い画面では「ログイン」の文字を鍵のアイコンだけにして、1行に収める */
+@media (max-width: 480px) {
+  .login-label { font-size: 0; margin-right: 0; }
+  .login-box { padding-left: 10px; }
+}

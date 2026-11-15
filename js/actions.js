@@ -187,15 +187,15 @@ export async function finishTodo(slug, text, { undo = true } = {}) {
   }
 }
 
-export async function addRecord(slug, text) {
+export async function addRecord(slug, text, date = isoToday()) {
   const c = bySlug(slug);
   if (!c || !text) return;
-  const date = isoToday();
   await commit(() => {
     const x = bySlug(slug);
     if (!x || x.history.some((h) => h.date === date && h.text === text)) return;
-    x.history = [{ date, text }, ...x.history];
-    x.lastAction = date;
+    // 新しい順に。過去の日付で書いたものは、その日の位置に入れる
+    x.history = [{ date, text }, ...x.history].sort((a, b) => b.date.localeCompare(a.date));
+    if (!x.lastAction || date > x.lastAction) x.lastAction = date;
   }, `${c.name}: ${text}`);
   render();
 }
