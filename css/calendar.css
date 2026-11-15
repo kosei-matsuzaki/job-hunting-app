@@ -85,3 +85,7 @@
   .cal-ev.done { border-left-color: var(--faint); background: var(--sheet-2); color: var(--faint); text-decoration: line-through; }
   .cal-evs b { padding-left: 6px; color: var(--muted); font-size: 0.625rem; }
 }
+
+/* 今月の一覧で畳んだ、今日より前の予定 */
+.cal-past { margin: 10px 0 0; }
+.cal-past > summary { padding: 10px 0; color: var(--muted); font-size: 0.8125rem; font-weight: 700; cursor: pointer; }

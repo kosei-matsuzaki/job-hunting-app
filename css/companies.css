@@ -56,7 +56,7 @@
 .sort-pick select { width: auto; min-height: 34px; padding: 4px 10px; font-size: 0.875rem; }
 
 .co-item { border-bottom: 1px solid var(--rule); }
-.co-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; column-gap: 4px; }
+.co-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; align-content: start; column-gap: 4px; }
 .co-item > * { grid-column: 1 / -1; }
 .co-item > .co-row { grid-column: 1; grid-template-columns: auto 1fr; border-bottom: 0; }
 .co-item > .co-login { grid-column: 2; grid-row: 1; align-self: start; padding: 15px 0 0; }
@@ -70,6 +70,13 @@
 .co-login { display: flex; gap: 0; }
 .open-dot { display: inline-flex; align-items: center; gap: 4px; color: var(--ok); font-size: 0.75rem; font-weight: 700; }
 .open-dot::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+
+/* 狭い画面: 左の字下げを詰め、ルート名は2行まで見せる */
+@media (max-width: 520px) {
+  .co-item > .cp-list, .co-item > .co-next { padding-left: 12px; }
+  .co-item .cp-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; line-height: 1.4; }
+  .co-item .cp-state { align-self: start; }
+}
 
 @media (min-width: 760px) {
   .co-controls { display: grid; grid-template-columns: auto 1fr; align-items: end; gap: 0 24px; margin-bottom: 6px; }

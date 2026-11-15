@@ -86,10 +86,10 @@ export function viewEdit(slug) {
         <label>やること（1行に1つ。企業ページでチェックすると消える）<textarea name="todo" rows="3">${esc(c.todo.join("\n"))}</textarea></label>
       </section>
 
-      <div class="form-actions">
+      <div class="form-actions save-bar">
         <button class="btn primary wide" type="submit">保存する</button>
-        ${isNew ? "" : `<button type="button" class="btn danger wide" data-delete="${esc(c.slug)}">この企業を削除</button>`}
       </div>
+      ${isNew ? "" : `<div class="form-actions"><button type="button" class="btn danger wide" data-delete="${esc(c.slug)}">この企業を削除</button></div>`}
     </form>`;
 }
 

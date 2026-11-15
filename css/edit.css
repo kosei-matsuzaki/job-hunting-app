@@ -18,3 +18,14 @@ fieldset label.check { flex-direction: row; align-items: center; gap: 8px; color
 fieldset label.check input { width: 20px; height: 20px; min-height: 0; accent-color: var(--ink); }
 fieldset [data-remove-fs] { grid-column: 1 / -1; justify-self: end; margin-top: 6px; }
 .form-actions { margin-top: 24px; }
+/* 長いフォームでも保存がいつも押せるように、画面の下に留める */
+.save-bar {
+  position: sticky;
+  bottom: calc(var(--tabs-h) + env(safe-area-inset-bottom) + 8px);
+  z-index: 5;
+  margin-inline: -6px;
+  padding: 6px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter: blur(6px);
+}

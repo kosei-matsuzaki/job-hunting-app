@@ -96,7 +96,7 @@ export function viewCompanies() {
       ${COMPANY_TABS.map((t) => `<button role="tab" data-ctab="${t.v}" aria-selected="${!searching() && t.v === tab}">${t.label}<span>${pool.filter((c) => t.test(companyState(c))).length}</span></button>`).join("")}
     </div>
     <div class="filter-bar">
-      <input id="cq" class="search-box" type="search" placeholder="企業名で探す（ログインもここから）" value="${esc(ui.cq)}" enterkeyhint="search">
+      <input id="cq" class="search-box" type="search" placeholder="企業名で探す" title="名前で探すと、タブに関係なく全部の企業から出ます（ログイン情報もここから）" value="${esc(ui.cq)}" enterkeyhint="search">
       <select id="co-sort" aria-label="並び順">${SORTS.map((o) => `<option value="${o.v}"${o.v === ui.sort ? " selected" : ""}>${o.label}</option>`).join("")}</select>
     </div>
     <div class="chips" role="group" aria-label="業界">

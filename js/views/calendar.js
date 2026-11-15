@@ -74,9 +74,17 @@ export function viewCalendar(sel) {
 
   const monthEvents = events.filter((e) => e.date.startsWith(`${y}-${String(m + 1).padStart(2, "0")}`)).sort(byWhen);
   if (monthEvents.length) {
-    html += `<h2 class="sec">${m + 1}月の予定<span class="count">${monthEvents.length}</span></h2><ul class="ev-list plain">${monthEvents
-      .map((e) => eventRow(e, { date: true }))
-      .join("")}</ul>`;
+    // 今月なら、今日より前の予定は畳んで下に（これからの予定を先に見せる）
+    const t = isoToday();
+    const ahead = monthEvents.filter((e) => e.date >= t);
+    const past = monthEvents.filter((e) => e.date < t);
+    const rows = (list) => `<ul class="ev-list plain">${list.map((e) => eventRow(e, { date: true })).join("")}</ul>`;
+    html += `<h2 class="sec">${m + 1}月の予定<span class="count">${monthEvents.length}</span></h2>`;
+    if (ahead.length && past.length) {
+      html += rows(ahead) + `<details class="cal-past"><summary>今日より前の予定<span class="count">${past.length}</span></summary>${rows(past)}</details>`;
+    } else {
+      html += rows(monthEvents);
+    }
   }
   html += `</div></div><div class="fab-space"></div><a class="fab" href="#/add/${selected}" aria-label="予定を追加">${ICONS.plus}</a>`;
   return html;

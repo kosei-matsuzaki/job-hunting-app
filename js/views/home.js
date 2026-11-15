@@ -90,7 +90,7 @@ export function viewHome() {
   html += `</div><div class="dash-side">`;
 
   if (active.length) {
-    html += `<section class="card"><h2 class="sec">選考中<span class="count">${active.length}</span></h2><ul class="active-list">`;
+    html += `<section class="card"><h2 class="sec">選考中のルート<span class="count">${active.length}</span></h2><ul class="active-list">`;
     for (const { c, p, nx, r } of active) {
       html += `
         <li><a class="active-row" href="#/c/${esc(c.slug)}/${esc(p.id)}">
