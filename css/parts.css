@@ -75,7 +75,7 @@
 }
 .tag.event { background: var(--ai-soft); color: var(--ai); }
 .tag.tentative { margin: 0 0 0 6px; border: 1px dashed var(--faint); background: none; }
-.tag.prog { border: 1px solid currentColor; background: none; }
+.tag.prog { padding: 0; background: none; color: var(--faint); }
 .tag.wait { margin: 0; border: 1px solid var(--ink); background: none; color: var(--ink); }
 
 /* マイページのパスワード: 押すと表示 */
@@ -179,40 +179,48 @@
   white-space: nowrap;
 }
 
-/* 選考ルートの行（企業一覧・企業ページ）: 種類｜名前｜状況、2行目に次の予定か結果の連絡日 */
-.cp-list { margin: -6px 0 0; padding: 0 0 10px 52px; list-style: none; }
+/* 選考ルートの行（企業一覧・企業ページ）。1行に印は1つだけ。
+   種類は色の文字だけ、選考中・内定のルートは名前を墨の太字に、応募前は名前を薄く。区切り線は引かない */
+.cp-list { margin: -8px 0 0; padding: 0 0 12px 52px; list-style: none; }
 .cp-row {
   display: grid;
-  grid-template-columns: 4.6em minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 2px 8px;
-  padding: 6px 0;
-  border-top: 1px dashed var(--rule);
+  grid-template-columns: 4.4em minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 1px 10px;
+  padding: 5px 0;
   color: var(--ink);
   font-size: 0.8125rem;
   text-decoration: none;
 }
-.cp-list li:first-child .cp-row { border-top: 0; }
-.cp-row .kind { justify-self: start; min-width: 4.2em; text-align: center; }
-.cp-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cp-kind { --k: var(--ai); color: var(--k); font-size: 0.6875rem; font-weight: 700; white-space: nowrap; }
+.cp-kind.intern { --k: var(--intern); }
+.cp-kind.early { --k: var(--early); }
+.cp-kind.info { --k: var(--faint); }
+.cp-title { overflow: hidden; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; }
+.cp-row.st-todo .cp-title, .cp-row.st-offer .cp-title { color: var(--ink); font-weight: 700; }
 .cp-row:hover .cp-title { text-decoration: underline; text-underline-offset: 3px; }
-.cp-state { display: flex; align-items: center; justify-self: end; gap: 6px; }
-.cp-step { font-size: 0.8125rem; white-space: nowrap; }
-.cp-closed { color: var(--faint); font-size: 0.6875rem; white-space: nowrap; }
+.cp-state { justify-self: end; white-space: nowrap; }
+.cp-step { font-size: 0.8125rem; }
+.cp-open { color: var(--ok); font-size: 0.75rem; font-weight: 700; }
+.cp-quiet { color: var(--faint); font-size: 0.75rem; }
 .cp-when { grid-column: 2 / -1; display: flex; align-items: baseline; gap: 0 8px; min-width: 0; color: var(--muted); font-size: 0.75rem; }
 .cp-when b { flex: none; color: var(--ink); font-family: var(--num); font-size: 0.875rem; font-weight: 600; font-variant-numeric: tabular-nums; }
-.cp-when .tag { flex: none; margin: 0; }
 .cp-ev { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cp-when em { flex: none; margin-left: auto; font-style: normal; font-weight: 700; white-space: nowrap; }
-.cp-when.urgent, .cp-when.urgent b { color: var(--shu); }
+.cp-when.urgent b, .cp-when.urgent em { color: var(--shu); }
 .cp-when.soon em { color: var(--early); }
 .cp-when.late em { color: var(--faint); font-weight: 500; }
-/* 結果の連絡日は相手の番なので、墨の破線で囲む */
-.cp-when.is-result b { padding: 0 5px; border: 1px dashed var(--ink); border-radius: 3px; font-family: var(--font); font-size: 0.75rem; font-weight: 700; }
-.cp-when.is-result.urgent b { border-color: var(--shu); }
-.cp-row.st-skip, .cp-row.st-declined, .cp-row.st-rejected { opacity: 0.6; }
-.cp-more { padding: 4px 0 0; color: var(--faint); font-size: 0.75rem; }
-.co-item > .co-next { margin: -4px 0 0; padding: 0 0 10px 52px; }
+/* 結果待ち: 相手の番なので墨の破線の印。連絡日はその横に */
+.cp-wait { flex: none; padding: 0 5px; border: 1px dashed var(--ink); border-radius: 3px; color: var(--ink); font-size: 0.6875rem; font-weight: 700; line-height: 1.6; }
+.cp-when.is-wait b { font-family: var(--font); font-size: 0.8125rem; font-weight: 700; }
+.cp-row.st-skip, .cp-row.st-declined, .cp-row.st-rejected { opacity: 0.55; }
+.cp-more { padding: 2px 0 0; color: var(--faint); font-size: 0.75rem; }
+.co-item > .co-next { margin: -6px 0 0; padding: 0 0 12px 52px; }
+
+/* 企業一覧のログイン: 名前の行の右に、小さなアイコンで */
+.lg-btn { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; }
+.lg-btn:hover { background: var(--sheet-2); color: var(--ink); }
+.lg-btn svg { width: 19px; height: 19px; }
 
 .tag.result { border: 1px dashed var(--ink); background: none; color: var(--ink); }
 .ev-row.is-result .ev-time { color: var(--ink); }

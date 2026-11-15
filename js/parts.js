@@ -13,6 +13,7 @@ export const ICONS = {
   plus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
   edit: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></svg>',
   check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
+  calAdd: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4M12 13v5M9.5 15.5h5"/></svg>',
 };
 
 export function avatar(c, size = "") {
@@ -39,41 +40,38 @@ export function sortPrograms(c) {
   return [...c.programs].sort((a, b) => STATE_RANK[a.state] - STATE_RANK[b.state] || when(a).localeCompare(when(b)));
 }
 
-// 選考ルート1つの状況の行（企業一覧・企業ページで共通）。
-// 種類｜名前｜状況（段階・結果待ち）、2行目に次の予定か結果の連絡の予定日
+// 選考ルート1つの状況の行（企業一覧・企業ページで共通）。1行に印は1つだけにする。
+// 1行目: 種類｜名前｜いまの段階（選考中は太字の段階、内定は朱の印、応募前は受付状況だけ）
+// 2行目: 結果待ちならその旨と連絡日、それ以外は次の予定
 export function progRow(c, p, { href = `#/c/${c.slug}/${p.id}`, current = false } = {}) {
   const s = p.state;
   const nx = nextEvent(c, p.id);
   const r = pendingResult(c, p);
+  const waiting = isWaiting(c, p);
   let state = "";
-  if (s === "todo") {
-    state = `${p.step ? `<b class="cp-step">${esc(p.step)}</b>` : statePill(s)}${isWaiting(c, p) ? '<span class="tag wait">結果待ち</span>' : ""}`;
-  } else if (s === "plan") {
-    state = `${statePill(s)}${p.status === "受付中" ? '<span class="open-dot">受付中</span>' : p.status === "終了" ? '<span class="cp-closed">受付終了</span>' : ""}`;
-  } else {
-    state = statePill(s);
-  }
+  if (s === "todo") state = `<b class="cp-step">${esc(p.step || "選考中")}</b>`;
+  else if (s === "offer") state = statePill(s);
+  else if (s === "plan") state = p.status === "受付中" ? '<span class="cp-open">受付中</span>' : p.status === "終了" ? '<span class="cp-quiet">受付終了</span>' : "";
+  else state = `<span class="cp-quiet">${STATES[s].label}</span>`;
   let when = "";
-  if (r) {
-    const w = resultWhen(r);
-    when = `<span class="cp-when is-result ${w.cls}"><b>${esc(w.text)}</b><em>${esc(w.left)}</em></span>`;
+  if (waiting) {
+    const w = r && resultWhen(r);
+    when = `<span class="cp-when is-wait ${w ? w.cls : ""}"><span class="cp-wait">結果待ち</span>${w ? `<b>${esc(w.text.replace(/結果$/, ""))}</b><em>${esc(w.left)}</em>` : '<span class="cp-quiet">連絡日は未登録</span>'}</span>`;
   } else if (nx && !ENDED.has(s)) {
     const n = daysUntil(nx.date);
-    when = `<span class="cp-when ${urgency(n)}"><b>${esc(fmtDate(nx.date))}</b>${nx.kind === "event" ? '<span class="tag event">日程</span>' : ""}<span class="cp-ev">${esc(nx.title)}</span><em>${esc(remainText(n))}</em></span>`;
-  } else if (s === "todo" && isWaiting(c, p)) {
-    when = `<span class="cp-when is-result faint">結果の連絡日は未登録</span>`;
+    when = `<span class="cp-when ${urgency(n)}"><b>${esc(fmtDate(nx.date))}</b><span class="cp-ev">${esc(nx.title)}</span><em>${esc(remainText(n))}</em></span>`;
   }
   return `<a class="cp-row st-${s}" href="${esc(href)}"${current ? ' aria-current="true"' : ""}>
-    ${kindBadge(p.kind, true)}<span class="cp-title">${esc(p.title || p.kind)}</span><span class="cp-state">${state}</span>${when}</a>`;
+    <span class="cp-kind ${KIND_CLASS[p.kind] || "main"}">${esc(KIND_SHORT[p.kind] || p.kind)}</span><span class="cp-title">${esc(p.title || p.kind)}</span><span class="cp-state">${state}</span>${when}</a>`;
 }
 
 // マイページを開く・ID と PW をコピーするボタン
 export function loginButtons(c) {
   const m = c.mypage;
   return [
-    m.url && `<a class="mini" href="${esc(m.url)}" target="_blank" rel="noopener noreferrer">${ICONS.door}マイページ</a>`,
-    m.id && `<button class="mini" data-copy="${esc(m.id)}" data-copy-label="ID">${ICONS.id}ID</button>`,
-    m.password && `<button class="mini" data-copy="${esc(m.password)}" data-copy-label="パスワード">${ICONS.key}PW</button>`,
+    m.url && `<a class="lg-btn" href="${esc(m.url)}" target="_blank" rel="noopener noreferrer" title="マイページを開く" aria-label="${esc(c.name)} のマイページを開く">${ICONS.door}</a>`,
+    m.id && `<button class="lg-btn" data-copy="${esc(m.id)}" data-copy-label="ID" title="IDをコピー" aria-label="${esc(c.name)} のIDをコピー">${ICONS.id}</button>`,
+    m.password && `<button class="lg-btn" data-copy="${esc(m.password)}" data-copy-label="パスワード" title="パスワードをコピー" aria-label="${esc(c.name)} のパスワードをコピー">${ICONS.key}</button>`,
   ].filter(Boolean).join("");
 }
 
@@ -82,7 +80,7 @@ export const stars = (c) => (c.priority ? `<span class="stars-mini" title="志�
 export function eventTitle(e, showProgram = false) {
   return (
     (e.kind === "event" ? '<span class="tag event">日程</span>' : e.kind === "result" ? '<span class="tag result">結果</span>' : "") +
-    (showProgram && e.p && e.c.programs.length > 1 ? `<span class="tag prog">${esc(e.p.kind)}</span>` : "") +
+    (showProgram && e.p && e.c.programs.length > 1 ? `<span class="tag prog">${esc(KIND_SHORT[e.p.kind] || e.p.kind)}</span>` : "") +
     esc(e.title) +
     (e.tentative ? '<span class="tag tentative">目安</span>' : "")
   );

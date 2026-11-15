@@ -23,7 +23,7 @@
 
 /* マイページ: 開く・コピーと、登録・変更のフォーム */
 .login-card { margin-bottom: 22px; }
-.quick { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.quick { display: flex; flex-wrap: wrap; gap: 6px; }
 .login-card .quick + .mp-edit, .login-card .quick + .cred { margin-top: 8px; }
 .cred { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; color: var(--muted); font-size: 0.8125rem; }
 .cred code { font-family: var(--mono); color: var(--ink); }
@@ -39,8 +39,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 46px;
-  padding: 6px 12px;
+  min-height: 38px;
+  padding: 4px 12px;
   border: 1px solid var(--rule);
   border-radius: 8px;
   background: var(--sheet);
@@ -52,7 +52,7 @@
   text-decoration: none;
   cursor: pointer;
 }
-.qa svg { width: 20px; height: 20px; color: var(--muted); }
+.qa svg { width: 18px; height: 18px; color: var(--muted); }
 .qa:hover { border-color: var(--ink); }
 .qa.muted { border-style: dashed; color: var(--faint); font-weight: 500; }
 .qa.muted svg { color: var(--faint); }
@@ -94,17 +94,18 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  margin: 2px 0 10px;
-  padding: 10px 12px;
-  border: 1px solid var(--rule);
-  border-radius: 8px;
-  background: var(--paper);
+  margin: 0 0 10px;
+  padding: 6px 0;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  border-radius: 0;
+  background: none;
   color: var(--ink);
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
-.status-btn:hover { border-color: var(--ink); }
+.status-btn:hover .status-change { text-decoration: underline; }
 .status-btn .pill { padding: 1px 9px; font-size: 0.8125rem; }
 .status-text { flex: 1; min-width: 0; color: var(--muted); font-size: 0.8125rem; }
 .status-change { color: var(--ai); font-size: 0.8125rem; font-weight: 700; }
@@ -215,7 +216,6 @@
 .h-date { flex: none; width: 4.6em; color: var(--muted); font-family: var(--num); font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
 
 @media (min-width: 760px) {
-  .quick { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
   .prog-panel { padding: 20px 22px 16px; }
 }
 
@@ -273,3 +273,16 @@
   .prog-list .cp-row { padding: 12px 18px; }
   .prog-panel.in-list { padding: 14px 18px 16px; }
 }
+
+/* ES・面接の資料へのリンク（大きなボタンにしない） */
+.prog-aside { margin: 10px 0 0; font-size: 0.875rem; text-align: center; }
+
+/* 予定: 残り日数の下に、カレンダーに追加する小さなアイコン */
+.ck-side { display: flex; flex: none; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 0.75rem; white-space: nowrap; }
+.cal-icons { display: flex; gap: 2px; }
+.ic { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--faint); font: inherit; font-size: 0.8125rem; font-weight: 900; text-decoration: none; cursor: pointer; }
+.ic:hover { background: var(--sheet-2); color: var(--ink); }
+.ic svg { width: 18px; height: 18px; }
+.done-evs summary { display: flex; align-items: center; gap: 6px; padding: 10px 0 4px; color: var(--muted); font-size: 0.8125rem; font-weight: 700; cursor: pointer; }
+.result-box .result-form { margin-top: 8px; }
+.result-box.is-empty .hint { margin-bottom: 0; }

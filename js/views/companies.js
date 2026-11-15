@@ -60,11 +60,10 @@ export function companyRows() {
             <span class="co-top"><span class="co-name">${esc(c.name)}</span>${stars(c)}</span>
             ${ui.sort === "salary" ? `<span class="co-salary">${c.salary ? `初任給 ¥${Number(c.salary).toLocaleString()}` : "初任給 不明"}</span>` : ""}
           </span>
-          <span class="co-ind"><i class="ind-dot ${IND_CLASS[c.industry] || "other"}"></i>${esc(c.industry || "")}</span>
         </a>
+        ${hasLogin(c) ? `<div class="co-login">${loginButtons(c)}</div>` : ""}
         ${shown.length || hidden ? `<ul class="cp-list">${shown.map((p) => `<li>${progRow(c, p)}</li>`).join("")}${hidden ? `<li class="cp-more">ほかに終了 ${hidden}件</li>` : ""}</ul>` : ""}
         ${nx ? `<p class="co-next ${urgency(daysUntil(nx.date))}"><span>${esc(fmtDate(nx.date))}</span>${esc(nx.title)}<em>${esc(remainText(daysUntil(nx.date)))}</em></p>` : ""}
-        ${hasLogin(c) ? `<div class="co-login">${loginButtons(c)}</div>` : ""}
       </li>`;
   };
   const hints = {
