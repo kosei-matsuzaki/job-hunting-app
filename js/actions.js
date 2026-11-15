@@ -33,6 +33,8 @@ async function updateProgram(slug, pid, patch, note) {
   if (!p) return;
   const label = c.programs.length > 1 ? `${p.title || p.kind}: ` : "";
   const text = label + note;
+  // 段階・状況が変わったら「受けて結果待ち」は終わり
+  patch = { ...patch, waiting: undefined, waitingSince: undefined };
   const before = Object.fromEntries(Object.keys(patch).map((k) => [k, p[k]]));
   const lastAction = c.lastAction;
   // 段階や状況が変わったら、待っていた結果の連絡は来たということなので済みにする
@@ -93,6 +95,41 @@ export function statusClick(t) {
     if (idx + 1 < p.flow.length) return updateProgram(slug, pid, { step: p.flow[idx + 1], state: "todo" }, `${p.flow[idx]}を通過した`);
     return updateProgram(slug, pid, { state: "offer" }, `${p.flow[idx]}を通過して内定`);
   }
+}
+
+// いまの段階を受け終えて、結果を待つ（段階は進めない）。日付が分かればその日に結果の予定を入れる
+export async function markWaiting(slug, pid) {
+  const c = bySlug(slug);
+  const p = programOf(c, pid);
+  if (!p) return;
+  const day = isoToday();
+  const label = c.programs.length > 1 ? `${p.title || p.kind}: ` : "";
+  const text = `${label}${p.step || p.flow[0] || "選考"}を受けた（結果待ち）`;
+  const lastAction = c.lastAction;
+  const ok = await commit(() => {
+    const x = bySlug(slug);
+    const q = programOf(x, pid);
+    if (!q) return;
+    q.waiting = true;
+    q.waitingSince = day;
+    x.lastAction = day;
+    if (x.history?.[0]?.text !== text || x.history[0].date !== day) x.history = [{ date: day, text }, ...(x.history || [])];
+  }, `${c.name}: ${text}`, { quiet: true });
+  render();
+  if (!ok) return;
+  undoable("結果待ちにしました", async () => {
+    await commit(() => {
+      const x = bySlug(slug);
+      const q = programOf(x, pid);
+      if (!q) return;
+      delete q.waiting;
+      delete q.waitingSince;
+      x.lastAction = lastAction;
+      const i = (x.history || []).findIndex((h) => h.text === text && h.date === day);
+      if (i >= 0) x.history.splice(i, 1);
+    }, `${c.name}: 取り消し（${text}）`);
+    render();
+  }, ok);
 }
 
 // 結果の連絡の予定日を入れる（そのルートのまだ来ていない結果の予定は1つにまとめる）

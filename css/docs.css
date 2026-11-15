@@ -27,7 +27,7 @@
 /* テーマのページ */
 .theme-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 0; }
 .theme-meta .ep-id { padding: 3px 8px; }
-.theme-file { margin-left: auto; font-size: 0.8125rem; }
+.theme-file { margin-left: auto; }
 .version { margin: 12px 0 0; padding: 12px 14px 4px; border: 1px solid var(--rule); border-left: 4px solid var(--ink); border-radius: 2px 8px 8px 2px; background: var(--sheet); }
 .version-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .version-top h3 { flex: 1; margin: 0; font-size: 1rem; }

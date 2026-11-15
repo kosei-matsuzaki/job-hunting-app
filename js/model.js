@@ -51,11 +51,12 @@ export function defaultProgram(c) {
 export function pendingResult(c, p) {
   if (p.state !== "todo") return null;
   const r = resultEvent(c, p.id);
+  if (r && p.waiting) return r;
   const nx = nextEvent(c, p.id);
   return r && (!nx || r.date <= nx.date) ? r : null;
 }
 
-// 選考中で、そのルートにこれからの予定がないか、結果の連絡を先に待っている（相手の番）
-export const isWaiting = (c, p) => p.state === "todo" && (!nextEvent(c, p.id) || !!pendingResult(c, p));
+// 選考中で、いまの段階を受け終えた（waiting）か、そのルートにこれからの予定がないか、結果の連絡を先に待っている（相手の番）
+export const isWaiting = (c, p) => p.state === "todo" && (!!p.waiting || !nextEvent(c, p.id) || !!pendingResult(c, p));
 
 export const hasLogin = (c) => !!(c.mypage.url || c.mypage.id || c.mypage.password);

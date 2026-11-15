@@ -4,7 +4,7 @@ import { COMPANY_TABS, PAST_DAYS, WD } from "../config.js";
 import { addDays, dayLabel, daysUntil, fmtDate, isoOf, today, urgency, whenText } from "../dates.js";
 import { esc } from "../md.js";
 import { byWhen, companyState, isEnded, isResult, isWaiting, liveEvents, nextEvent, pendingResult } from "../model.js";
-import { avatar, eventRow, groupByDay, kindBadge, resultWhen, routeMini } from "../parts.js";
+import { avatar, eventRow, groupByDay, ICONS, kindBadge, resultWhen, routeMini } from "../parts.js";
 import { state } from "../store.js";
 
 export function viewHome() {
@@ -58,7 +58,7 @@ export function viewHome() {
   }
 
   // 1週間の帯
-  html += `<section class="card week-card"><h2 class="card-title">この1週間<a class="sec-link" href="#/calendar">カレンダー</a></h2><ol class="week-strip" aria-label="今週">`;
+  html += `<section class="card week-card"><h2 class="card-title">この1週間<a class="act" href="#/calendar">${ICONS.cal}カレンダー</a></h2><ol class="week-strip" aria-label="今週">`;
   for (let i = 0; i < 7; i++) {
     const d = addDays(t, i);
     const iso = isoOf(d);
@@ -85,7 +85,7 @@ export function viewHome() {
   html += `</section>`;
   const later = upcoming.filter((e) => daysUntil(e.date) > 6).slice(0, 5);
   if (later.length) {
-    html += `<section class="card"><h2 class="sec">その先の予定<a class="sec-link" href="#/calendar">カレンダー</a></h2><ul class="ev-list plain">${later.map((e) => eventRow(e, { date: true })).join("")}</ul></section>`;
+    html += `<section class="card"><h2 class="sec">その先の予定<a class="act" href="#/calendar">${ICONS.cal}カレンダー</a></h2><ul class="ev-list plain">${later.map((e) => eventRow(e, { date: true })).join("")}</ul></section>`;
   }
   html += `</div><div class="dash-side">`;
 

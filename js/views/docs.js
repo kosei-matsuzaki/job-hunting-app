@@ -152,7 +152,7 @@ export function viewDocs() {
   const themes = finals();
   const done = themes.filter((t) => t.versions.length).length;
 
-  html += `<h2 class="sec">確定版<span class="count">${done}/${themes.length}</span><button class="sec-link mini" data-newtheme>テーマを足す</button></h2>
+  html += `<h2 class="sec">確定版<span class="count">${done}/${themes.length}</span><button class="act" data-newtheme>${ICONS.plus}テーマを足す</button></h2>
     <p class="sec-hint hint">テーマを開くと、確定版がいちばん上に、書くときの参考（エピソードの事実・過去のES）がその下に出ます。</p>
     <ul class="themes">${themes.map(themeCard).join("") || `<li class="hint">${loadingNote() || "まだありません。"}</li>`}</ul>`;
 
@@ -259,7 +259,7 @@ export function viewTopic(key, query) {
     <nav class="topic-tabs" aria-label="設問の種類">${TOPICS.map((x) => `<a href="#/docs/${x.key}"${x.key === key ? ' aria-current="page"' : ""}>${esc(x.name)}</a>`).join("")}</nav>
     <h2 class="sec">確定版</h2>
     ${themes.length
-      ? themes.map((th) => `<section class="theme-block"><h3 class="theme-block-head"><a href="${finalLink(th.file)}">${esc(th.name)}</a></h3>${th.versions.length ? th.versions.map((v) => versionItem(th, v, { edit: false })).join("") : `<p class="hint">まだ書いていません。<a href="${finalLink(th.file, "new=1")}">書く</a></p>`}</section>`).join("")
+      ? themes.map((th) => `<section class="theme-block"><h3 class="theme-block-head"><a href="${finalLink(th.file)}">${esc(th.name)}</a></h3>${th.versions.length ? th.versions.map((v) => versionItem(th, v, { edit: false })).join("") : `<p class="hint">まだ書いていません。<a class="act" href="${finalLink(th.file, "new=1")}">${ICONS.plus}書く</a></p>`}</section>`).join("")
       : `<p class="hint">${loadingNote() || "この種類のテーマはまだありません。"}</p>`}
     <h2 class="sec">参考: 過去のESと下書き<span class="count">${pool.length}</span></h2>
     <p class="sec-hint hint">「本人」の印がないものは AI が書いた文。内容（事実）の確認に使い、文章は確定版に書く。</p>
@@ -310,8 +310,8 @@ export function viewFinal(file, query) {
         const tp = TOPICS.find((x) => x.name === k);
         return tp ? `<a class="chip" href="#/docs/${tp.key}">${esc(k)}</a>` : "";
       }).join("")}${t.eps.map((e) => `<span class="ep-id" title="${esc(eps.find((x) => x.id === e)?.title || "")}">${esc(e)}</span>`).join("")}
-      <a class="theme-file" href="${docLink(path)}/edit">話・種類・説明を直す</a></p></header>
-    <div class="theme-layout"><div class="theme-main"><h2 class="sec">確定版<span class="count">${t.versions.length}</span>${isNew || target ? "" : `<a class="sec-link" href="${finalLink(t.file, "new=1")}">新しい版を書く</a>`}</h2>`;
+      <a class="act theme-file" href="${docLink(path)}/edit">${ICONS.edit}話・種類・説明を直す</a></p></header>
+    <div class="theme-layout"><div class="theme-main"><h2 class="sec">確定版<span class="count">${t.versions.length}</span>${isNew || target ? "" : `<a class="act" href="${finalLink(t.file, "new=1")}">${ICONS.plus}新しい版を書く</a>`}</h2>`;
   if (isNew) html += finalForm(t, null, true);
   html += t.versions.map((v) => (v === target ? finalForm(t, v, false) : versionItem(t, v))).join("");
   if (!t.versions.length && !isNew) {
@@ -425,7 +425,7 @@ export function viewDocEdit(path, doc, query) {
   return `
     <a class="back" href="${back}">${esc(docName(path))}</a>
     <form id="docedit" data-path="${esc(path)}"${sec ? ` data-sec="${k}" data-head="${esc(sec.head)}"` : ""}>
-      <div class="doc-head"><span class="doc-path">${sec ? `<b>${esc(sec.head.replace(/^#+\s*/, ""))}</b> だけを直す・<a href="#/doc/${encodeURIComponent(path)}/edit">ファイル全体を直す</a>` : esc(path)}</span><span class="chars" id="doc-count"></span></div>
+      <div class="doc-head"><span class="doc-path">${sec ? `<b>${esc(sec.head.replace(/^#+\s*/, ""))}</b> だけを直す <a class="act" href="#/doc/${encodeURIComponent(path)}/edit">${ICONS.edit}ファイル全体を直す</a>` : esc(path)}</span><span class="chars" id="doc-count"></span></div>
       <textarea name="text" class="doc-text${sec ? " is-section" : ""}" spellcheck="false">${esc(text)}</textarea>
       <p class="hint">文字を選択すると、選択した部分の文字数（空白・改行を除く）が上に出ます。</p>
       <div class="final-actions"><button class="btn primary" type="submit">保存する</button><a class="btn" href="${back}">やめる</a></div>

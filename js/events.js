@@ -1,9 +1,9 @@
 // 画面の操作を受け取る
 
-import { addRecord, addTodo, finishTodo, markDone, saveMypage, setResultDate, statusClick, undoable } from "./actions.js";
+import { addRecord, addTodo, finishTodo, markDone, markWaiting, saveMypage, setResultDate, statusClick, undoable } from "./actions.js";
 import { DEFAULT_FLOW, FINALS_DIR, PRIORITY_LABEL } from "./config.js";
 import { addDocPath, commit, DOC_KEY, idle, loadCompanies, loadDocList, newId, normalize, saveDoc } from "./data.js";
-import { daysUntil, isoToday } from "./dates.js";
+import { addDays, daysUntil, isoOf, isoToday, today } from "./dates.js";
 import { explain, writeFile } from "./github.js";
 import { downloadIcs } from "./ics.js";
 import { esc } from "./md.js";
@@ -37,6 +37,12 @@ document.addEventListener("click", async (ev) => {
   if (t.dataset.copy !== undefined) return copy(t.dataset.copy, t.dataset.copyLabel);
   if (t.dataset.done) return markDone(t.dataset.done);
   if (t.dataset.state || t.dataset.step || t.dataset.pass) return statusClick(t);
+  if (t.dataset.wait) return markWaiting(...t.dataset.wait.split(":"));
+  if (t.dataset.resultIn) {
+    const [slug, pid, days] = t.dataset.resultIn.split(":");
+    t.disabled = true;
+    return setResultDate(slug, pid, isoOf(addDays(today(), Number(days))));
+  }
   if (t.dataset.sheet) return openSheet(t.dataset.sheet);
   if (t.dataset.ctab) {
     ui.ctab = t.dataset.ctab;
@@ -225,8 +231,10 @@ document.addEventListener("change", (ev) => {
 
 // 送信中は書きかけの印を外す（保存して移動するときに確かめないように）。保存できずに同じ画面に残ったら戻す
 document.addEventListener("submit", async (ev) => {
-  ev.preventDefault();
   const form = ev.target;
+  // <form method="dialog"> は閉じるだけ（止めるとダイアログが閉じない）
+  if (form.getAttribute("method") === "dialog") return;
+  ev.preventDefault();
   const dirty = form.hasAttribute("data-dirty");
   const hash = location.hash;
   form.removeAttribute("data-dirty");
@@ -312,7 +320,7 @@ async function onSubmit(form) {
       // 状況と段階はフォームにないので、同じ id の選考ルートから引き継ぐ
       const programs = data.programs.map((p) => {
         const old = programOf(c, p.id);
-        return { ...p, state: old?.state || "plan", step: old?.step || "" };
+        return { ...p, state: old?.state || "plan", step: old?.step || "", ...(old?.waiting ? { waiting: true, waitingSince: old.waitingSince } : {}) };
       });
       Object.assign(c, structuredClone({ ...data, programs }));
       if (!c.salary) delete c.salary;

@@ -1,7 +1,7 @@
 // 描画とルーティング
 
 import { COMPANY_TABS } from "./config.js";
-import { getDoc, hasNote, loadAllDocs } from "./data.js";
+import { getDoc, loadAllDocs } from "./data.js";
 import { explain } from "./github.js";
 import { esc } from "./md.js";
 import { companyState } from "./model.js";
@@ -85,10 +85,6 @@ export async function render() {
 function afterRender(name, sub, arg) {
   // 素材の一覧は全部の素材の中身から作るので、まだ読んでいないものを読んでから描き直す
   if (name === "docs") document.querySelector(".topic-tabs [aria-current]")?.scrollIntoView({ block: "nearest", inline: "center" });
-  // 企業ページのESの一覧はノートの中身から作る
-  if (name === "c" && sub !== "edit" && hasNote(arg) && !state.docCache.has(`notes/${arg}.md`)) {
-    getDoc(`notes/${arg}.md`).then(() => route().parts[1] === arg && render()).catch(() => {});
-  }
   if (name === "docs") loadAllDocs().then((loaded) => loaded && route().parts[0] === "docs" && render());
   if (name === "doc" && sub === "edit") bindDocCounter();
   if (name === "docs" && arg === "final") bindFinalCounter();
