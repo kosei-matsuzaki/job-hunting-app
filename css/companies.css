@@ -29,7 +29,7 @@
 
 .ctabs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   margin: 0 0 12px;
   border-bottom: 1px solid var(--rule);
 }
@@ -80,8 +80,31 @@
 
 @media (min-width: 760px) {
   .co-controls { display: grid; grid-template-columns: auto 1fr; align-items: end; gap: 0 24px; margin-bottom: 6px; }
-  .co-controls .ctabs { grid-template-columns: repeat(3, auto); gap: 20px; margin: 0; }
+  .co-controls .ctabs { grid-template-columns: repeat(4, auto); gap: 20px; margin: 0; }
   .co-controls .ctabs button { padding-inline: 2px; }
   .co-controls .filter-bar { margin-bottom: 6px; }
   .co-controls .chips { grid-column: 1 / -1; flex-wrap: wrap; overflow: visible; margin: 14px 0 0; padding: 0; }
+}
+
+/* 行の状況のラベル（タブは志望度なので、選考の状況はここで見る） */
+.co-top { flex-wrap: wrap; row-gap: 2px; }
+.co-status { align-self: center; margin-left: 6px; padding: 0 6px; border: 1px solid var(--rule); border-radius: 3px; color: var(--muted); font-size: 0.6875rem; font-weight: 700; line-height: 1.6; white-space: nowrap; }
+.co-status.st-todo { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+.co-status.st-offer { border-color: var(--shu); background: var(--shu); color: var(--sheet); }
+.co-status.st-check { border: 1px dashed var(--ink); color: var(--ink); }
+.co-status.st-ended, .co-status.st-none { border-color: transparent; color: var(--faint); }
+
+/* 志望の企業で選考がないとき: いつ確かめたかと「確認した」 */
+.co-check { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: -4px 0 12px; padding: 8px 10px; border: 1px dashed var(--rule); border-radius: 8px; color: var(--muted); font-size: 0.8125rem; }
+.co-item > .co-check { margin-left: 52px; }
+.co-check > span:first-child { color: var(--ink); font-weight: 700; }
+.co-check.stale { border-color: var(--ink); }
+.cc-hint { flex: 1 1 10em; font-size: 0.75rem; }
+.co-check .mini { margin-left: auto; gap: 4px; }
+.co-check .mini svg { width: 15px; height: 15px; }
+
+@media (max-width: 520px) {
+  .co-item > .co-check { margin-left: 12px; }
+  .ctabs button { font-size: 0.8125rem; }
+  .ctabs button span { display: block; margin: 0; font-size: 0.875rem; line-height: 1.2; }
 }

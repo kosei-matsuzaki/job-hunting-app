@@ -46,6 +46,18 @@ document.addEventListener("click", async (ev) => {
   }
   if (t.dataset.sheet) return openSheet(t.dataset.sheet);
   if (t.dataset.modal) return openModal(t.dataset.modal);
+  // 志望の企業で選考がないとき: 次の募集を確かめた日を残す
+  if (t.dataset.checked) {
+    const slug = t.dataset.checked;
+    const c = bySlug(slug);
+    const day = isoToday();
+    const old = c.checked;
+    t.disabled = true;
+    const ok = await commit(() => { const x = bySlug(slug); if (x) x.checked = day; }, `${c.name}: 募集を確認した`, { quiet: true });
+    render();
+    if (ok) undoable("確認した日を残しました", async () => { await commit(() => { const x = bySlug(slug); if (!x) return; if (old) x.checked = old; else delete x.checked; }, `${c.name}: 確認の取り消し`); render(); }, ok);
+    return;
+  }
   if (t.dataset.delProg || t.dataset.delEv) return deleteFromModal(t);
   if (t.dataset.ctab) {
     ui.ctab = t.dataset.ctab;

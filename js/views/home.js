@@ -1,9 +1,10 @@
 // 画面: ホーム
 
-import { COMPANY_TABS, PAST_DAYS, WD } from "../config.js";
+import { PAST_DAYS, WD } from "../config.js";
 import { addDays, dayLabel, daysUntil, fmtDate, isoOf, today, urgency, whenText } from "../dates.js";
 import { esc } from "../md.js";
-import { byWhen, companyState, isEnded, isResult, isWaiting, liveEvents, nextEvent, pendingResult } from "../model.js";
+import { byWhen, companyStatus, isEnded, isResult, isWaiting, liveEvents, nextEvent, pendingResult, sinceChecked } from "../model.js";
+import { checkLine, statusTag } from "./companies.js";
 import { avatar, eventRow, groupByDay, ICONS, kindBadge, resultWhen, routeMini } from "../parts.js";
 import { state } from "../store.js";
 
@@ -22,14 +23,18 @@ export function viewHome() {
     }))
     // 自分の予定があるもの → 結果の連絡日が分かっているもの → どちらもないもの
     .sort((a, b) => !a.nx - !b.nx || !a.r - !b.r || byWhen(a.nx || a.r || { date: "9999" }, b.nx || b.r || { date: "9999" }));
-  const count = (tab) => state.companies.filter((c) => COMPANY_TABS.find((x) => x.v === tab).test(companyState(c))).length;
+  const byStatus = (...ks) => state.companies.filter((c) => ks.includes(companyStatus(c).k));
+  // 志望の企業で選考がないもの（次の募集を確かめる）。長く確かめていないものから
+  const checks = byStatus("check").sort((a, b) => (sinceChecked(b) ?? 9999) - (sinceChecked(a) ?? 9999) || (b.priority || 0) - (a.priority || 0));
 
   let html = `
     <header class="page-head">
       <h1 class="page-title">${t.getMonth() + 1}月${t.getDate()}日<span class="wd">${WD[t.getDay()]}曜日</span></h1>
     </header>
     <nav class="tally" aria-label="企業の状況">
-      ${["active", "plan", "closed"].map((v) => `<a href="#/companies" data-goto-tab="${v}" class="tally-item ${v}"><b>${count(v)}</b>${COMPANY_TABS.find((x) => x.v === v).label}</a>`).join("")}
+      <a href="#/companies" class="tally-item"><b>${byStatus("todo", "offer").length}</b>選考中</a>
+      <a href="#/companies" data-goto-tab="p3" class="tally-item"><b>${state.companies.filter((c) => c.priority === 3).length}</b>第一志望群</a>
+      ${checks.length ? `<button class="tally-item${checks.length ? " warn" : ""}" data-jump="check-card"><b>${checks.length}</b>要確認</button>` : `<span class="tally-item"><b>0</b>要確認</span>`}
     </nav>
     <div class="dash"><div class="dash-main">`;
 
@@ -105,6 +110,12 @@ export function viewHome() {
         </a></li>`;
     }
     html += `</ul></section>`;
+  }
+
+  if (checks.length) {
+    html += `<section class="card" id="check-card"><h2 class="sec">志望で選考がない企業<span class="count">${checks.length}</span></h2>
+      <p class="hint">次の募集や早期選考の案内が出ていないか確かめて、「確認した」を押してください。</p>
+      <ul class="check-list">${checks.map((c) => `<li><a class="check-co" href="#/c/${esc(c.slug)}">${avatar(c)}<span class="co-name">${esc(c.name)}</span>${statusTag(c)}</a>${checkLine(c)}</li>`).join("")}</ul></section>`;
   }
 
   if (overdue.length) {

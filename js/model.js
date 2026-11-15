@@ -33,7 +33,8 @@ export const isResult = (e) => e.kind === "result";
 // これからの自分の予定（締切・日程）。結果の連絡は除く
 export function nextEvent(c, pid) {
   return c.events
-    .filter((e) => !e.done && !isResult(e) && daysUntil(e.date) >= 0 && (!pid || e.program === pid))
+    // ルートが1つだけなら、ルートを指定していない予定もそのルートのもの
+    .filter((e) => !e.done && !isResult(e) && daysUntil(e.date) >= 0 && (!pid || e.program === pid || (!e.program && c.programs?.length === 1)))
     .sort(byWhen)[0];
 }
 
@@ -88,3 +89,22 @@ export function stepOf(c, e) {
 // その段階のまだ済んでいない予定（締切・日程）。日付の順
 export const stepEvents = (c, p, i) =>
   c.events.map((e, k) => ({ ...e, i: k })).filter((e) => routeOfEvent(c, e)?.id === p.id && !e.done && stepOf(c, e) === i).sort(byWhen);
+
+// 企業の状況のラベル（一覧の行・ホーム）。
+// 内定 → 選考中 → 応募前（これからの予定がある）→ 選考なし（予定がない・全部終わった）。
+// 志望度が付いた企業で選考がなければ「要確認」にして、次の募集を確かめるよう促す
+export function companyStatus(c) {
+  const s = companyState(c);
+  if (s === "offer") return { k: "offer", label: "内定", rank: 0 };
+  if (s === "todo") return { k: "todo", label: "選考中", rank: 1 };
+  const ended = ENDED.has(s);
+  if (!ended && nextEvent(c)) return { k: "plan", label: "応募前", rank: 3 };
+  if (c.priority) return { k: "check", label: ended ? "終了・次を確認" : "選考なし・要確認", rank: 2 };
+  return ended ? { k: "ended", label: "終了", rank: 5 } : { k: "none", label: "予定なし", rank: 4 };
+}
+
+// 最後に募集を確かめた日（確認した日、なければ最後に動かした日）から何日たったか
+export const sinceChecked = (c) => {
+  const d = c.checked || c.lastAction;
+  return d ? -daysUntil(d) : null;
+};

@@ -4,7 +4,6 @@ import { COMPANY_TABS } from "./config.js";
 import { getDoc, loadAllDocs } from "./data.js";
 import { explain } from "./github.js";
 import { esc } from "./md.js";
-import { companyState } from "./model.js";
 import { cfg, state, store, ui } from "./store.js";
 import { viewCalendar } from "./views/calendar.js";
 import { companyPool, companyRows, currentTab, searching, viewCompanies } from "./views/companies.js";
@@ -115,7 +114,7 @@ function afterRender(name, sub, arg) {
       const pool = companyPool();
       document.querySelectorAll(".ctabs button").forEach((b) => {
         const t = COMPANY_TABS.find((x) => x.v === b.dataset.ctab);
-        b.querySelector("span").textContent = pool.filter((c) => t.test(companyState(c))).length;
+        b.querySelector("span").textContent = pool.filter(t.test).length;
         b.setAttribute("aria-selected", !searching() && b.dataset.ctab === currentTab());
       });
     });
