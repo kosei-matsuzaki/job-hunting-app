@@ -29,6 +29,7 @@ export function renderChrome() {
   const [name, , sub] = route().parts;
   const tab = { c: "companies", new: "companies", doc: "docs", add: "calendar", schedule: "home" }[name] || name;
   document.querySelectorAll(".tabs a").forEach((a) => a.toggleAttribute("aria-current", a.dataset.tab === tab));
+  document.querySelectorAll(".top a.icon-btn").forEach((a) => a.toggleAttribute("aria-current", a.getAttribute("href") === `#/${name}`));
   // 画面ごとに幅を変える（フォームや文章は読みやすい幅、一覧やダッシュボードは広く）
   $view().dataset.view = sub === "edit" && name !== "docs" ? "form" : { new: "form", add: "form", settings: "form", search: "form" }[name] || name || "home";
   document.getElementById("reload").classList.toggle("spinning", state.loading);

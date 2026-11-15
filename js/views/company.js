@@ -111,7 +111,7 @@ function programPanel(c, p, { inList = false } = {}) {
   } else if (s === "todo" && p.flow.length) {
     const nextStep = idx >= 0 ? p.flow[idx + 1] : p.flow[0];
     const label = idx < 0 ? `選考を始める（${p.flow[0]}から）` : nextStep ? `${p.flow[idx]}を通過（次は${nextStep}）` : `${p.flow[idx]}を通過（内定）`;
-    html += `<div class="pass-row"><button class="btn primary" data-pass="${key}">${esc(label)}</button>${idx >= 0 ? `<button class="btn ghost" data-state="${key}:rejected">不合格</button>` : ""}</div>`;
+    html += `<div class="pass-row"><button class="btn primary" data-pass="${key}">${esc(label)}</button>${idx >= 0 ? `<button class="btn quiet" data-state="${key}:rejected">不合格</button>` : ""}</div>`;
   }
 
   // このルートの予定。結果待ちの欄に出した連絡予定は重ねない

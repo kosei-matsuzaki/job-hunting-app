@@ -21,12 +21,12 @@
   --ai-soft: #e2e9f4;
   --ok: #2c7a4d;
   --ok-soft: #e0f0e6;
-  --game: #d4492f;
+  --game: #b8365f;
   --web: #0f7c74;
   --ai-rd: #6a48c8;
   --consult: #2f68ad;
   --maker: #a26a12;
-  --sier: #a8306f;
+  --sier: #8d3fa3;
   --trade: #2f6f3e;
   --finance: #7d6418;
   --other: #6b7078;
@@ -59,6 +59,15 @@
     --ok-soft: #183124;
     --intern: #46c0b6;
     --early: #e0a43a;
+    --game: #e2779a;
+    --web: #4cb8ae;
+    --ai-rd: #a58ef0;
+    --consult: #78a6e0;
+    --maker: #d4a24a;
+    --sier: #c27ad6;
+    --trade: #6dbb80;
+    --finance: #c8ad5a;
+    --other: #9a9fa6;
     color-scheme: dark;
   }
 }
@@ -81,6 +90,15 @@
   --ok-soft: #183124;
   --intern: #46c0b6;
   --early: #e0a43a;
+  --game: #e2779a;
+  --web: #4cb8ae;
+  --ai-rd: #a58ef0;
+  --consult: #78a6e0;
+  --maker: #d4a24a;
+  --sier: #c27ad6;
+  --trade: #6dbb80;
+  --finance: #c8ad5a;
+  --other: #9a9fa6;
   color-scheme: dark;
 }
 
@@ -142,7 +160,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   text-decoration: none;
   cursor: pointer;
 }
-.icon-btn:hover { color: var(--ink); background: var(--sheet-2); }
+.icon-btn:hover, .icon-btn[aria-current] { color: var(--ink); background: var(--sheet-2); }
 .icon-btn.spinning svg { animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -270,7 +288,9 @@ main { max-width: 680px; margin: 0 auto; padding: 4px var(--gutter) 0; }
 .btn.primary { background: var(--ink); color: var(--paper); }
 .btn.primary:hover { background: color-mix(in srgb, var(--ink) 86%, var(--paper)); }
 .btn.ghost { border-style: dashed; border-color: var(--faint); background: transparent; }
-.btn.danger { border-color: var(--shu); background: transparent; color: var(--shu); }
+/* 朱は締切と内定の印にだけ使うので、削除・不合格などは墨の控えめな実線にする（確認のダイアログが出る） */
+.btn.danger, .btn.quiet { border-color: var(--rule); background: transparent; color: var(--muted); }
+.btn.danger:hover, .btn.quiet:hover { border-color: var(--ink); background: transparent; color: var(--ink); }
 .btn.small { min-height: 34px; padding: 4px 12px; border-radius: 7px; font-size: 0.8125rem; }
 .btn.wide { display: flex; width: 100%; margin: 10px 0; }
 .btn:disabled { opacity: 0.5; cursor: wait; }
@@ -292,7 +312,7 @@ main { max-width: 680px; margin: 0 auto; padding: 4px var(--gutter) 0; }
   cursor: pointer;
 }
 .mini:hover { border-color: var(--ink); }
-.mini.danger { color: var(--shu); }
+.mini.danger { color: var(--muted); }
 .mini.muted { border-style: dashed; color: var(--faint); }
 .mini.primary { border-color: var(--ink); background: var(--ink); color: var(--paper); font-weight: 700; }
 
@@ -371,7 +391,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--ink); outline: 3
   transition: opacity 0.18s, transform 0.18s;
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
-.toast.error { background: var(--shu); color: #fff; }
+.toast.error { background: var(--shu); color: var(--sheet); }
 .toast.actionable { pointer-events: auto; }
 .toast-btn {
   flex: none;

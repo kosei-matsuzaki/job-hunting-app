@@ -18,7 +18,7 @@
   line-height: 1;
   cursor: pointer;
 }
-.stars button[aria-pressed="true"] { color: var(--shu); }
+.stars button[aria-pressed="true"] { color: var(--ink); }
 .stars-label { margin-left: 6px; color: var(--muted); font-size: 0.75rem; }
 
 /* マイページ: 開く・コピーと、登録・変更のフォーム */
@@ -252,7 +252,7 @@
 .prog-info .prog-recruit { margin: 4px 0 8px; }
 .pass-row { display: flex; gap: 8px; }
 .pass-row .btn.primary { flex: 1; min-width: 0; }
-.pass-row .btn.ghost { flex: none; }
+.pass-row .btn.quiet { flex: none; }
 
 /* ルートの予定 */
 .prog-evs { margin: 18px 0 0; }

@@ -50,10 +50,10 @@
 
 .filter-bar { display: flex; gap: 8px; }
 .filter-bar .search-box { flex: 1; margin: 0; }
-.filter-bar select { flex: none; width: auto; font-size: 0.875rem; }
+.filter-bar select { flex: none; width: auto; }
 .tab-hint { margin: 10px 0 2px; font-size: 0.8125rem; }
 .sort-pick { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin: 2px 0 0; color: var(--muted); font-size: 0.8125rem; }
-.sort-pick select { width: auto; min-height: 34px; padding: 4px 10px; font-size: 0.875rem; }
+.sort-pick select { width: auto; min-height: 34px; padding: 4px 10px; }
 
 .co-item { border-bottom: 1px solid var(--rule); }
 .co-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; align-content: start; column-gap: 4px; }

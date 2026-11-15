@@ -76,7 +76,7 @@
 .tag.event { background: var(--ai-soft); color: var(--ai); }
 .tag.tentative { margin: 0 0 0 6px; border: 1px dashed var(--faint); background: none; }
 .tag.prog { padding: 0; background: none; color: var(--faint); }
-.tag.wait { margin: 0; border: 1px solid var(--ink); background: none; color: var(--ink); }
+.tag.wait { margin: 0; border: 1px dashed var(--ink);  /* 結果待ちは相手の番なので破線（.cp-wait と同じ） */ background: none; color: var(--ink); }
 
 /* マイページのパスワード: 押すと表示 */
 .pw-mask { padding: 0; border: 0; background: none; color: var(--faint); font-family: var(--mono); font-size: 0.8125rem; letter-spacing: 0.08em; cursor: pointer; }
@@ -84,10 +84,10 @@
 
 /* 1行で書き足すフォーム（やること・記録） */
 .inline-add { display: flex; gap: 8px; margin: 10px 0 4px; }
-.inline-add input { flex: 1; min-width: 0; min-height: 38px; font-size: 0.875rem; }
+.inline-add input { flex: 1; min-width: 0; min-height: 38px; }  /* 16px 未満だと iPhone で入力時に拡大される */
 .inline-add .mini { flex: none; min-width: 52px; }
 
-.stars-mini { margin-left: 6px; color: var(--shu); font-size: 0.6875rem; letter-spacing: -0.05em; }
+.stars-mini { margin-left: 6px; color: var(--ink); font-size: 0.6875rem; letter-spacing: -0.05em; }
 
 .day-head { margin: 16px 0 0; color: var(--muted); font-size: 0.8125rem; font-weight: 700; }
 .day-head.urgent { color: var(--shu); }
@@ -156,11 +156,11 @@
 .ar-next.urgent, .co-next.urgent { color: var(--shu); }
 .ar-next.soon, .co-next.soon { color: var(--early); }
 
-/* 押印欄（小）: 通った段階は墨、いまの段階は朱 */
+/* 押印欄（小）: 通った段階は墨で塗り、いまの段階は半分だけ塗る（朱は締切と内定だけに使う） */
 .route-mini { display: inline-flex; gap: 2px; }
 .route-mini .st { width: 9px; height: 9px; border: 1.5px solid var(--faint); border-radius: 2px; }
 .route-mini .st.past { border-color: var(--ink); background: var(--ink); }
-.route-mini .st.now { border-color: var(--shu); background: var(--shu); }
+.route-mini .st.now { border-color: var(--ink); background: linear-gradient(135deg, var(--ink) 50%, transparent 50%); }
 
 @media (min-width: 760px) {
   .co-list, .doc-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 0 32px; }

@@ -97,7 +97,7 @@ export function viewHome() {
           ${avatar(c)}
           <span class="ar-body">
             <span class="ar-name">${esc(c.name)}</span>
-            <span class="ar-prog">${routeMini(p)}<b>${esc(p.step || "")}</b>${isWaiting(c, p) ? '<span class="tag wait">結果待ち</span>' : ""}${c.programs.length > 1 ? kindBadge(p.kind) : ""}</span>
+            <span class="ar-prog">${routeMini(p)}<b>${esc(p.step || "")}</b>${isWaiting(c, p) ? '<span class="tag wait">結果待ち</span>' : ""}${c.programs.length > 1 ? kindBadge(p.kind, true) : ""}</span>
             ${nx ? `<span class="ar-next ${urgency(daysUntil(nx.date))}">${esc(fmtDate(nx.date))} ${esc(nx.title)}</span>` : ""}
             ${r ? (() => { const w = resultWhen(r); return `<span class="ar-next is-result ${w.cls}">${esc(w.text)}<em>${esc(w.left)}</em></span>`; })() : ""}
             ${!nx && !r ? `<span class="ar-next faint">結果の連絡日は未登録</span>` : ""}
