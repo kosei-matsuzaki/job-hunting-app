@@ -13,6 +13,7 @@ export const ICONS = {
   plus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
   edit: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></svg>',
   check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
+  copy: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>',
   calAdd: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4M12 13v5M9.5 15.5h5"/></svg>',
 };
 
@@ -49,12 +50,16 @@ export function progRow(c, p, { href = `#/c/${c.slug}/${p.id}`, current = false 
   const r = pendingResult(c, p);
   const waiting = isWaiting(c, p);
   let state = "";
-  if (s === "todo") state = `<b class="cp-step">${esc(p.step || "選考中")}</b>`;
+  // 開いているルートの状況・段階は、下の中身（状況のボタンと押印欄）に出す
+  if (current) state = "";
+  else if (s === "todo") state = `<b class="cp-step">${esc(p.step || "選考中")}</b>`;
   else if (s === "offer") state = statePill(s);
   else if (s === "plan") state = p.status === "受付中" ? '<span class="cp-open">受付中</span>' : p.status === "終了" ? '<span class="cp-quiet">受付終了</span>' : "";
   else state = `<span class="cp-quiet">${STATES[s].label}</span>`;
   let when = "";
-  if (waiting) {
+  // 開いているルートは、下の中身に詳しく出るので2行目を出さない
+  if (current) when = "";
+  else if (waiting) {
     const w = r && resultWhen(r);
     when = `<span class="cp-when is-wait ${w ? w.cls : ""}"><span class="cp-wait">結果待ち</span>${w ? `<b>${esc(w.text.replace(/結果$/, ""))}</b><em>${esc(w.left)}</em>` : '<span class="cp-quiet">連絡日は未登録</span>'}</span>`;
   } else if (nx && !ENDED.has(s)) {

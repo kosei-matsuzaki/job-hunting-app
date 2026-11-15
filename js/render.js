@@ -59,7 +59,7 @@ export async function render() {
     else if (name === "c" && arg && sub === "edit") html = viewEdit(arg);
     else if (name === "c" && arg) html = viewCompany(arg, sub);
     else if (name === "new") html = viewEdit(null);
-    else if (name === "add") html = viewAddEvent(arg, query.get("c"));
+    else if (name === "add") html = viewAddEvent(arg, query.get("c"), query.get("p"));
     else if (name === "docs") html = !arg ? viewDocs() : arg === "final" ? viewFinal(sub, query) : viewTopic(arg, query);
     else if (name === "search") html = viewSearch();
     else if (name === "settings") html = viewSettings();
