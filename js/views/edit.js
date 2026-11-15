@@ -25,6 +25,12 @@ export function programFieldset(p = {}) {
 }
 
 export function eventFieldset(e = {}, programs = [], removable = true) {
+  // 選考ルートが決まっていて段階があれば、どの段階の予定かを選べる（その段階の締切として、ルートの中に出る）
+  const flow = programs.find((p) => p.id === e.program)?.flow || [];
+  const stepSel = flow.length
+    ? `<label class="ev-step">段階（選ぶと、その段階の締切・日程としてルートの中に出る）<select name="step"><option value="">指定なし（予定と記録に出る）</option>${flow
+      .map((s) => `<option${s === e.step ? " selected" : ""}>${esc(s)}</option>`).join("")}</select></label>`
+    : "";
   return `
     <fieldset class="ev">
       <input class="ev-title-in" name="title" placeholder="内容（例: ES提出締切）" value="${esc(e.title || "")}">
@@ -32,6 +38,7 @@ export function eventFieldset(e = {}, programs = [], removable = true) {
       <label>選考ルート<select name="program"><option value="">指定なし</option>${programs
         .map((p) => `<option value="${esc(p.id)}"${p.id === e.program ? " selected" : ""}>${esc(p.kind)}：${esc(p.title || p.kind)}</option>`)
         .join("")}</select></label>
+      ${stepSel}
       <label>日付（締切・当日）<input type="date" name="date" value="${esc(e.date || "")}"></label>
       <label>時刻<input type="time" name="time" value="${esc(e.time || "")}"></label>
       <label>開始日（期間のときだけ）<input type="date" name="start" value="${esc(e.start || "")}"></label>
@@ -98,6 +105,7 @@ export function readEvent(fs) {
   const e = { title: v("title").value.trim(), date: v("date").value };
   if (["event", "result"].includes(v("kind")?.value)) e.kind = v("kind").value;
   if (v("program")?.value) e.program = v("program").value;
+  if (e.program && v("step")?.value) e.step = v("step").value;
   if (v("time").value) e.time = v("time").value;
   if (v("start").value) e.start = v("start").value;
   if (v("startTime").value) e.startTime = v("startTime").value;

@@ -3,7 +3,7 @@
 import { ENDED, STATES } from "./config.js";
 import { commit, MERGED } from "./data.js";
 import { isoToday } from "./dates.js";
-import { bySlug, flowIndex, programOf } from "./model.js";
+import { bySlug, flowIndex, programOf, stepOf } from "./model.js";
 import { render } from "./render.js";
 import { toast } from "./toast.js";
 
@@ -27,7 +27,15 @@ export async function markDone(key, done = true, { undo = true } = {}) {
   if (ok && undo) undoable(done ? "済みにしました" : "未完了に戻しました", () => markDone(key, !done, { undo: false }), ok);
 }
 
-async function updateProgram(slug, pid, patch, note) {
+// その段階の、まだ済んでいない予定（締切・日程）を「内容 @ 日付」で。通過・受けたら済みにする
+const stepKeys = (c, pid, step) => {
+  const p = programOf(c, pid);
+  const i = p ? p.flow.indexOf(step) : -1;
+  const mine = (e) => e.program === pid || (!e.program && c.programs.length === 1);
+  return i < 0 ? [] : c.events.filter((e) => mine(e) && !e.done && e.kind !== "result" && stepOf(c, e) === i).map((e) => `${e.title} @ ${e.date}`);
+};
+
+async function updateProgram(slug, pid, patch, note, { closeStep } = {}) {
   const c = bySlug(slug);
   const p = programOf(c, pid);
   if (!p) return;
@@ -38,8 +46,11 @@ async function updateProgram(slug, pid, patch, note) {
   const before = Object.fromEntries(Object.keys(patch).map((k) => [k, p[k]]));
   const lastAction = c.lastAction;
   // 段階や状況が変わったら、待っていた結果の連絡は来たということなので済みにする
-  const closing = c.events.filter((e) => e.program === pid && e.kind === "result" && !e.done).map((e) => `${e.title} @ ${e.date}`);
-  const isClosing = (e) => e.program === pid && e.kind === "result" && closing.includes(`${e.title} @ ${e.date}`);
+  const closing = [
+    ...c.events.filter((e) => e.program === pid && e.kind === "result" && !e.done).map((e) => `${e.title} @ ${e.date}`),
+    ...(closeStep ? stepKeys(c, pid, closeStep) : []),
+  ];
+  const isClosing = (e) => (e.program === pid || (!e.program && c.programs.length === 1)) && closing.includes(`${e.title} @ ${e.date}`);
   const ok = await commit(() => {
     const x = bySlug(slug);
     const q = programOf(x, pid);
@@ -92,8 +103,8 @@ export function statusClick(t) {
     if (p.state !== "todo" || idx < 0) {
       return updateProgram(slug, pid, { step: p.flow[0] || "", state: "todo" }, `応募した${p.flow[0] ? `（${p.flow[0]}）` : ""}`);
     }
-    if (idx + 1 < p.flow.length) return updateProgram(slug, pid, { step: p.flow[idx + 1], state: "todo" }, `${p.flow[idx]}を通過した`);
-    return updateProgram(slug, pid, { state: "offer" }, `${p.flow[idx]}を通過して内定`);
+    if (idx + 1 < p.flow.length) return updateProgram(slug, pid, { step: p.flow[idx + 1], state: "todo" }, `${p.flow[idx]}を通過した`, { closeStep: p.flow[idx] });
+    return updateProgram(slug, pid, { state: "offer" }, `${p.flow[idx]}を通過して内定`, { closeStep: p.flow[idx] });
   }
 }
 
@@ -106,12 +117,16 @@ export async function markWaiting(slug, pid) {
   const label = c.programs.length > 1 ? `${p.title || p.kind}: ` : "";
   const text = `${label}${p.step || p.flow[0] || "選考"}を受けた（結果待ち）`;
   const lastAction = c.lastAction;
+  // 受けた段階の締切・日程は済み
+  const closing = stepKeys(c, pid, p.step);
+  const isClosing = (e) => (e.program === pid || (!e.program && c.programs.length === 1)) && closing.includes(`${e.title} @ ${e.date}`);
   const ok = await commit(() => {
     const x = bySlug(slug);
     const q = programOf(x, pid);
     if (!q) return;
     q.waiting = true;
     q.waitingSince = day;
+    for (const e of x.events) if (isClosing(e)) e.done = true;
     x.lastAction = day;
     if (x.history?.[0]?.text !== text || x.history[0].date !== day) x.history = [{ date: day, text }, ...(x.history || [])];
   }, `${c.name}: ${text}`, { quiet: true });
@@ -124,6 +139,7 @@ export async function markWaiting(slug, pid) {
       if (!q) return;
       delete q.waiting;
       delete q.waitingSince;
+      for (const e of x.events) if (isClosing(e)) delete e.done;
       x.lastAction = lastAction;
       const i = (x.history || []).findIndex((h) => h.text === text && h.date === day);
       if (i >= 0) x.history.splice(i, 1);

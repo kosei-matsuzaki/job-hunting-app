@@ -60,3 +60,31 @@ export function pendingResult(c, p) {
 export const isWaiting = (c, p) => p.state === "todo" && (!!p.waiting || !nextEvent(c, p.id) || !!pendingResult(c, p));
 
 export const hasLogin = (c) => !!(c.mypage.url || c.mypage.id || c.mypage.password);
+
+// 予定がルートのどの段階のものか（flow の番号。分からなければ -1）。
+// step を持っていればそれ。なければ題名から推す: 段階の名前（「・」などで区切った語）が題名の先のほうに出てくる段階。
+// それもなく「応募・エントリー・申込」の締切なら最初の段階。結果の連絡は段階に付けない（結果待ちの欄で出す）
+const normText = (s) => String(s || "").toLowerCase().replace(/[\s（）()「」【】]/g, "");
+// ルートが1つだけなら、ルートを指定していない予定もそのルートのものとみなす
+const routeOfEvent = (c, e) => programOf(c, e.program) || (!e.program && c.programs.length === 1 ? c.programs[0] : null);
+export function stepOf(c, e) {
+  const p = routeOfEvent(c, e);
+  if (!p?.flow.length || e.kind === "result") return -1;
+  if (e.step) return p.flow.indexOf(e.step);
+  const t = normText(e.title);
+  let best = -1;
+  let at = Infinity;
+  p.flow.forEach((name, i) => {
+    for (const w of String(name).split(/[・、,／/]/).map(normText).filter((x) => x.length >= 2)) {
+      const k = t.indexOf(w);
+      if (k >= 0 && k < at) { at = k; best = i; }
+    }
+  });
+  if (best >= 0) return best;
+  if ((e.kind || "deadline") === "deadline" && /応募|エントリー|申込|申し込み/.test(e.title) && !/開始|解禁|オープン|公開/.test(e.title)) return 0;
+  return -1;
+}
+
+// その段階のまだ済んでいない予定（締切・日程）。日付の順
+export const stepEvents = (c, p, i) =>
+  c.events.map((e, k) => ({ ...e, i: k })).filter((e) => routeOfEvent(c, e)?.id === p.id && !e.done && stepOf(c, e) === i).sort(byWhen);

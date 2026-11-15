@@ -67,9 +67,14 @@ const builders = {
       { submit: p ? "保存する" : "追加する", extra: p && c.programs.length > 1 ? `<button type="button" class="btn danger wide modal-del" data-del-prog="${esc(c.slug)}:${esc(p.id)}">この選考ルートを削除</button>` : "" });
   },
   ev(c, arg) {
-    // arg: 予定の番号、または new-<ルートの id>
+    // arg: 予定の番号、または new~<ルートの id>~<段階の番号>（段階の締切を入れるとき）
     const isNew = String(arg).startsWith("new");
-    const e = isNew ? { program: String(arg).slice(4) } : c.events[Number(arg)];
+    let e;
+    if (isNew) {
+      const [, pid = "", si = ""] = String(arg).split("~");
+      const step = programOf(c, pid)?.flow[Number(si)];
+      e = { program: pid, ...(si !== "" && step ? { step, title: `${step} 締切` } : {}) };
+    } else e = c.events[Number(arg)];
     if (!e) return "";
     const fs = requiredEvent(eventFieldset(e, c.programs, false));
     return shell(isNew ? "予定を追加" : "予定を編集", c.name,

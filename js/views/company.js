@@ -7,7 +7,7 @@ import { hasNote } from "../data.js";
 import { addDays, daysUntil, evRemain, evWhen, fmtDate, isoOf, remainText, today } from "../dates.js";
 import { googleCalUrl } from "../ics.js";
 import { esc, renderMarkdown } from "../md.js";
-import { bySlug, byWhen, defaultProgram, flowIndex, hasLogin, isWaiting, programOf, resultEvent } from "../model.js";
+import { bySlug, byWhen, defaultProgram, flowIndex, hasLogin, isWaiting, programOf, resultEvent, stepEvents, stepOf } from "../model.js";
 import { avatar, ICONS, kindBadge, progRow, sortPrograms, statePill } from "../parts.js";
 import { state } from "../store.js";
 
@@ -70,6 +70,29 @@ function resultBox(c, p) {
   </div>`;
 }
 
+// いまの段階の締切（日程）。結果待ちの欄と同じ形で、日付を大きく、残り日数と編集。複数の回があれば下に並べる
+function stepBox(c, p, i) {
+  const step = p.flow[i];
+  const key = `${esc(c.slug)}:${esc(p.id)}`;
+  const evs = stepEvents(c, p, i);
+  if (!evs.length) {
+    return `<div class="step-box is-empty"><span class="step-tag">締切</span><b>${esc(step)}</b>
+      ${addBtn(`ev:${key.replace(":", ":new~")}~${i}`, "締切を入れる")}</div>`;
+  }
+  const [e, ...more] = evs;
+  const rm = evRemain(e);
+  const w = evWhen(e);
+  const label = e.kind === "event" ? "日程" : "締切";
+  return `<div class="step-box ${rm.cls}">
+    <p class="result-head"><span class="step-tag">${label}</span><b>${esc(step)}</b><span class="rb-since">${esc(e.title)}</span></p>
+    <div class="rb-when"><span class="rb-date">${esc(fmtDate(e.date))}</span><span class="rb-by">${esc(w.main.replace(fmtDate(e.date), "").trim())}</span>${e.tentative ? '<span class="tag tentative">目安</span>' : ""}<em>${esc(rm.text)}</em>
+      ${rm.cls === "late" ? "" : `<span class="cal-icons"><button class="ic" data-ics="${esc(c.slug)}:${e.i}" title="カレンダーに追加（.ics）" aria-label="${esc(e.title)} をカレンダーに追加">${ICONS.calAdd}</button><a class="ic g" href="${esc(googleCalUrl(e, c))}" target="_blank" rel="noopener noreferrer" title="Googleカレンダーに追加" aria-label="${esc(e.title)} をGoogleカレンダーに追加">G</a></span>`}
+      <button class="mini sb-done" data-done="${esc(c.slug)}:${e.i}" aria-label="${esc(e.title)} を済みにする">${ICONS.check}済み</button>${editBtn(`ev:${esc(c.slug)}:${e.i}`, `${esc(e.title)} を編集`)}</div>
+    ${w.sub ? `<p class="hint">${esc(w.sub)}</p>` : ""}
+    ${more.length ? `<ul class="sb-more">${more.map((x) => `<li><span class="h-date">${esc(fmtDate(x.date))}</span><span class="tl-body">${esc(x.title)}</span><em class="${evRemain(x).cls}">${esc(evRemain(x).text)}</em>${editBtn(`ev:${esc(c.slug)}:${x.i}`, `${esc(x.title)} を編集`)}</li>`).join("")}</ul>` : ""}
+  </div>`;
+}
+
 function programPanel(c, p, { inList = false } = {}) {
   const s = p.state;
   const idx = flowIndex(p);
@@ -95,13 +118,22 @@ function programPanel(c, p, { inList = false } = {}) {
     html += `<ol class="route${ENDED.has(s) ? " dim" : ""}" aria-label="選考の段階">`;
     p.flow.forEach((name, i) => {
       const cls = s === "offer" || i < idx ? "past" : i === idx ? `now${waiting && s === "todo" ? " wait" : ""}` : "";
+      // まだ先の段階には、その段階の締切（日程）の日付を小さく
+      const dl = s !== "offer" && i >= Math.max(idx, 0) && !ENDED.has(s) ? stepEvents(c, p, i)[0] : null;
+      const dlTag = dl ? `<span class="st-dl ${evRemain(dl).cls}">${esc(fmtDate(dl.date).replace(/\(.\)$/, "").replace(/^\d{4}\//, ""))}${dl.kind === "event" ? "" : "締切"}</span>` : "";
       html += `<li class="${cls}"${i === idx ? ' aria-current="step"' : ""}><button class="station" data-step="${key}:${i}" title="押すと、いまの段階を「${esc(name)}」にする">
-        <span class="st"></span><span class="route-name">${esc(name)}</span></button></li>`;
+        <span class="st"></span><span class="route-name">${esc(name)}</span>${dlTag}</button></li>`;
     });
     html += `</ol>`;
   }
 
   if (waiting) html += resultBox(c, p);
+  // 結果待ちでなければ、いまの段階（応募前なら最初の段階）の締切
+  // （応募前は、締切が入っている最初の段階。どこにもなければ最初の段階）
+  else if (p.flow.length && (s === "plan" || s === "todo")) {
+    const first = p.flow.findIndex((_, i) => stepEvents(c, p, i).length);
+    html += stepBox(c, p, s === "plan" || idx < 0 ? Math.max(first, 0) : idx);
+  }
 
   // いま押すボタン。選考中なら「通過」を大きく、「受けた（結果待ち）」と「不合格」を下に
   if (s === "plan") {
@@ -202,7 +234,8 @@ function timeline(c, p) {
   // 結果待ちの欄に出した連絡予定は重ねない
   const shown = c.programs.filter((q) => isWaiting(c, q)).map((q) => resultEvent(c, q.id)).filter(Boolean);
   const isShown = (e) => shown.some((r) => r.program === e.program && r.date === e.date && r.title === e.title);
-  const open = all.filter((e) => !e.done && !isShown(e)).sort(byWhen);
+  // 段階に付いた締切・日程はルートの中（押印欄と締切の欄）に出すので、ここには出さない
+  const open = all.filter((e) => !e.done && !isShown(e) && stepOf(c, e) < 0).sort(byWhen);
   const past = [
     ...all.filter((e) => e.done).map((e) => ({ date: e.date, ev: e })),
     ...c.history.map((h) => ({ date: h.date, text: h.text })),
@@ -213,7 +246,7 @@ function timeline(c, p) {
     : `<li><span class="h-date">${esc(fmtDate(x.date))}</span><span class="tl-body">${esc(x.text)}</span></li>`;
   const head = past.slice(0, 20);
   const rest = past.slice(20);
-  return `<section class="card timeline"><h2 class="sec">予定と記録<span class="sec-acts">${addBtn(`ev:${slugE}:new-${p ? esc(p.id) : ""}`, "予定")}${addBtn(`record:${slugE}`, "記録")}</span></h2>
+  return `<section class="card timeline"><h2 class="sec">予定と記録<span class="sec-acts">${addBtn(`ev:${slugE}:new~${p ? esc(p.id) : ""}`, "予定")}${addBtn(`record:${slugE}`, "記録")}</span></h2>
     ${open.length ? `<ul class="checklist ev-list">${open.slice(0, SOON).map((e) => evItem(c, e)).join("")}</ul>` : `<p class="hint">これからの予定はありません。</p>`}
     ${open.length > SOON ? `<details class="tl-more"><summary>その先の予定<span class="count">${open.length - SOON}</span></summary><ul class="checklist ev-list">${open.slice(SOON).map((e) => evItem(c, e)).join("")}</ul></details>` : ""}
     ${past.length ? `<h3 class="tl-head">これまで</h3><ol class="history">${head.map(pastItem).join("")}</ol>` : ""}

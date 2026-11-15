@@ -223,6 +223,17 @@ document.addEventListener("change", (ev) => {
   const t = ev.target;
   if (t.dataset.toggle) return markDone(t.dataset.toggle, t.checked);
   if (t.dataset.todoDone) return finishTodo(t.dataset.todoDone, t.value);
+  // 予定のフォーム: 選考ルートを変えたら、段階の選択肢をそのルートのものに
+  if (t.name === "program" && t.closest("fieldset.ev")) {
+    const fs = t.closest("fieldset.ev");
+    const form = t.closest("form");
+    const c = bySlug(form.dataset.slug || form.company?.value || "");
+    const flow = programOf(c, t.value)?.flow || [];
+    fs.querySelector(".ev-step")?.remove();
+    if (flow.length) {
+      t.closest("label").insertAdjacentHTML("afterend", `<label class="ev-step">段階（選ぶと、その段階の締切・日程としてルートの中に出る）<select name="step"><option value="">指定なし（予定と記録に出る）</option>${flow.map((s) => `<option>${esc(s)}</option>`).join("")}</select></label>`);
+    }
+  }
   // 予定の追加: 企業を選んだら、その企業の選考ルートを選べるようにする
   if (t.name === "company" && t.closest("#addev")) {
     const c = bySlug(t.value);
