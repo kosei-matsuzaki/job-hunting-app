@@ -21,6 +21,7 @@ export const ui = {
   sort: store.get("jh.sort") || "deadline",
   cq: "",
   q: "",
+  todosOpen: false, // ホームのやることを開いているか（済みにして描き直しても閉じないように）
 };
 
 export const state = {

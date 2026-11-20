@@ -218,6 +218,11 @@ document.addEventListener("click", (ev) => {
   store.set("jh.ctab", ui.ctab);
 }, true);
 
+// ホームのやることの開閉を覚える（toggle は泡立たないので捕捉で受ける）
+document.addEventListener("toggle", (ev) => {
+  if (ev.target.matches?.("details.todos")) ui.todosOpen = ev.target.open;
+}, true);
+
 document.addEventListener("change", (ev) => {
   const t = ev.target;
   if (t.dataset.toggle) return markDone(t.dataset.toggle, t.checked);

@@ -227,3 +227,20 @@
 .ar-next em { margin-left: 8px; font-style: normal; font-weight: 700; }
 .ar-next.is-result { color: var(--ink); }
 .ar-next.is-result.late em { color: var(--faint); font-weight: 500; }
+
+/* チェックできる一覧（企業ページのやること・予定、ホームのやること） */
+.checklist { margin: 0; padding: 0; list-style: none; }
+.checklist li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 0.9375rem;
+}
+.checklist label { display: flex; align-items: flex-start; gap: 10px; min-width: 0; cursor: pointer; }
+.checklist input { flex: none; width: 20px; height: 20px; min-height: 0; margin-top: 3px; accent-color: var(--ink); }
+.ck-body { display: flex; flex-direction: column; min-width: 0; line-height: 1.45; }
+.ck-when { color: var(--muted); font-family: var(--num); font-size: 0.875rem; font-weight: 500; font-variant-numeric: tabular-nums; }
+.checklist li.done .ck-title { color: var(--muted); text-decoration: line-through; }

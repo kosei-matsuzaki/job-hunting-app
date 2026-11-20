@@ -102,9 +102,14 @@ i.done { background: var(--faint); }
 
 .todos, .ended { margin-top: 28px; border-top: 2px solid var(--ink); }
 .todos summary, .ended summary { display: flex; align-items: center; gap: 8px; padding: 8px 0; font-size: 0.9375rem; font-weight: 700; cursor: pointer; }
-.todos ul { margin: 4px 0; padding-left: 1.2em; }
-.todos > ul > li { margin: 8px 0; }
-.todos li li { color: var(--muted); font-size: 0.875rem; }
+.todo-groups { margin: 4px 0 0; padding: 0; list-style: none; }
+.todo-groups > li { margin: 0 0 14px; }
+.todo-co { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; color: var(--ink); font-size: 0.875rem; font-weight: 700; text-decoration: none; }
+.todo-co .avatar { width: 24px; height: 24px; font-size: 0.6875rem; }
+.todo-groups .checklist li { font-size: 0.875rem; }
+
+/* 期限が過ぎた予定: 済んだか確かめるまで、朱の見出しで目立たせる */
+.overdue-card .sec { color: var(--shu); }
 
 .notice-link {
   display: flex;

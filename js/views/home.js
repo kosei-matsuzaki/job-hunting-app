@@ -6,7 +6,7 @@ import { esc } from "../md.js";
 import { byWhen, companyStatus, isEnded, isResult, isWaiting, liveEvents, nextEvent, pendingResult, sinceChecked } from "../model.js";
 import { checkLine, statusTag } from "./companies.js";
 import { avatar, eventRow, groupByDay, ICONS, kindBadge, resultWhen, routeMini } from "../parts.js";
-import { state } from "../store.js";
+import { state, ui } from "../store.js";
 
 export function viewHome() {
   const t = today();
@@ -32,7 +32,7 @@ export function viewHome() {
       <h1 class="page-title">${t.getMonth() + 1}月${t.getDate()}日<span class="wd">${WD[t.getDay()]}曜日</span></h1>
     </header>
     <nav class="tally" aria-label="企業の状況">
-      <a href="#/companies" class="tally-item"><b>${byStatus("todo", "offer").length}</b>選考中</a>
+      ${active.length ? `<button class="tally-item" data-jump="active-card"><b>${byStatus("todo", "offer").length}</b>選考中</button>` : `<a href="#/companies" class="tally-item"><b>${byStatus("todo", "offer").length}</b>選考中</a>`}
       <a href="#/companies" data-goto-tab="p3" class="tally-item"><b>${state.companies.filter((c) => c.priority === 3).length}</b>第一志望群</a>
       ${checks.length ? `<button class="tally-item${checks.length ? " warn" : ""}" data-jump="check-card"><b>${checks.length}</b>要確認</button>` : `<span class="tally-item"><b>0</b>要確認</span>`}
     </nav>
@@ -60,6 +60,13 @@ export function viewHome() {
       </section>`;
   } else {
     html += `<section class="empty-panel">これからの締切はありません。<br><a href="#/companies" data-goto-tab="plan">応募前の企業を見る</a></section>`;
+  }
+
+  // 過ぎた予定は、済んだか確かめるまで残るので、次の締切のすぐ下に出す（下に埋もれないように）
+  if (overdue.length) {
+    html += `<section class="card overdue-card" id="overdue-card"><h2 class="sec">期限が過ぎた予定<span class="count">${overdue.length}</span></h2>
+      <p class="hint">終わっていたら ✓ を押すと消えます。応募しないなら、企業ページでルートを「見送り」に。</p>
+      <ul class="ev-list plain">${overdue.map((e) => eventRow(e, { date: true })).join("")}</ul></section>`;
   }
 
   // 1週間の帯
@@ -95,7 +102,7 @@ export function viewHome() {
   html += `</div><div class="dash-side">`;
 
   if (active.length) {
-    html += `<section class="card"><h2 class="sec">選考中のルート<span class="count">${active.length}</span></h2><ul class="active-list">`;
+    html += `<section class="card" id="active-card"><h2 class="sec">選考中のルート<span class="count">${active.length}</span></h2><ul class="active-list">`;
     for (const { c, p, nx, r } of active) {
       html += `
         <li><a class="active-row" href="#/c/${esc(c.slug)}/${esc(p.id)}">
@@ -118,18 +125,15 @@ export function viewHome() {
       <ul class="check-list">${checks.map((c) => `<li><a class="check-co" href="#/c/${esc(c.slug)}">${avatar(c)}<span class="co-name">${esc(c.name)}</span>${statusTag(c)}</a>${checkLine(c)}</li>`).join("")}</ul></section>`;
   }
 
-  if (overdue.length) {
-    html += `<section class="card"><h2 class="sec">期限が過ぎた予定<span class="count">${overdue.length}</span></h2>
-      <p class="hint">終わっていたら ✓ を押すと消えます。</p>
-      <ul class="ev-list plain">${overdue.map((e) => eventRow(e, { date: true })).join("")}</ul></section>`;
-  }
-
   const todos = state.companies.filter((c) => c.todo.length && !isEnded(c));
   if (todos.length) {
     const total = todos.reduce((n, c) => n + c.todo.length, 0);
-    html += `<details class="todos card"><summary>やること<span class="count">${total}</span></summary><ul>`;
+    // 企業ページに行かなくても、ここで済みにできる
+    html += `<details class="todos card"${ui.todosOpen ? " open" : ""}><summary>やること<span class="count">${total}</span></summary><ul class="todo-groups">`;
     for (const c of todos) {
-      html += `<li><a href="#/c/${esc(c.slug)}">${esc(c.name)}</a><ul>${c.todo.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></li>`;
+      html += `<li><a class="todo-co" href="#/c/${esc(c.slug)}">${avatar(c)}${esc(c.name)}</a><ul class="checklist todo-list">${c.todo
+        .map((t) => `<li><label><input type="checkbox" data-todo-done="${esc(c.slug)}" value="${esc(t)}"><span class="ck-body"><span class="ck-title">${esc(t)}</span></span></label></li>`)
+        .join("")}</ul></li>`;
     }
     html += `</ul></details>`;
   }

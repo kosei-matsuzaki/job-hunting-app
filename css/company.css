@@ -141,23 +141,7 @@
 /* 調べた募集の情報（畳んでおく） */
 .prog-info { margin: 12px 0 0; border-top: 1px dashed var(--rule); }
 .prog-info summary { padding: 10px 0 4px; color: var(--muted); font-size: 0.8125rem; font-weight: 700; cursor: pointer; }
-.todo-list li { padding: 8px 0; }
 
-.checklist { margin: 0; padding: 0; list-style: none; }
-.checklist li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--rule);
-  font-size: 0.9375rem;
-}
-.checklist label { display: flex; align-items: flex-start; gap: 10px; min-width: 0; cursor: pointer; }
-.checklist input { flex: none; width: 20px; height: 20px; min-height: 0; margin-top: 3px; accent-color: var(--ink); }
-.ck-body { display: flex; flex-direction: column; min-width: 0; line-height: 1.45; }
-.ck-when { color: var(--muted); font-family: var(--num); font-size: 0.875rem; font-weight: 500; font-variant-numeric: tabular-nums; }
-.checklist li.done .ck-title { color: var(--muted); text-decoration: line-through; }
 .checklist li > span { font-size: 0.75rem; white-space: nowrap; }
 .late { color: var(--faint); }
 
