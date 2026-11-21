@@ -173,6 +173,36 @@ export async function saveMypage(slug, mypage) {
   render();
 }
 
+// 企業として見送る（on）・やめる（off）。何度呼ばれても同じ結果になるように、日付は先に決める
+export async function dropCompany(slug, on) {
+  const c = bySlug(slug);
+  if (!c) return;
+  const day = isoToday();
+  const old = c.dropped;
+  const apply = (x, value, note) => {
+    if (!x) return;
+    if (value) x.dropped = value;
+    else delete x.dropped;
+    if (!x.history.some((h) => h.date === day && h.text === note)) x.history = [{ date: day, text: note }, ...x.history];
+    x.lastAction = day;
+  };
+  const ok = await commit(() => apply(bySlug(slug), on ? day : null, on ? "企業として見送った（行かないと決めた）" : "企業の見送りをやめた"),
+    `${c.name}: ${on ? "企業として見送り" : "見送りをやめる"}`, { quiet: on });
+  render();
+  if (ok && on) {
+    undoable("見送りにしました", async () => {
+      await commit(() => {
+        const x = bySlug(slug);
+        if (!x) return;
+        if (old) x.dropped = old;
+        else delete x.dropped;
+        x.history = x.history.filter((h) => !(h.date === day && h.text === "企業として見送った（行かないと決めた）"));
+      }, `${c.name}: 見送りの取り消し`);
+      render();
+    }, ok);
+  }
+}
+
 export async function addTodo(slug, text) {
   const c = bySlug(slug);
   if (!c || !text) return;

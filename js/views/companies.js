@@ -3,14 +3,14 @@
 import { CHECK_DAYS, COMPANY_TABS, ENDED, IND_CLASS, INDUSTRIES, SORTS } from "../config.js";
 import { daysUntil, fmtDate, remainText, urgency } from "../dates.js";
 import { esc } from "../md.js";
-import { byWhen, companyStatus, hasLogin, isEnded, nextEvent, sinceChecked } from "../model.js";
+import { byWhen, companyStatus, hasLogin, isDropped, isEnded, nextEvent, sinceChecked } from "../model.js";
 import { avatar, ICONS, loginButtons, progRow, sortPrograms, stars } from "../parts.js";
 import { state, ui } from "../store.js";
 
 export function currentTab() {
   if (COMPANY_TABS.some((t) => t.v === ui.ctab)) return ui.ctab;
   // いちばん志望度の高い、企業があるタブ
-  return (COMPANY_TABS.find((t) => state.companies.some(t.test)) || COMPANY_TABS.at(-1)).v;
+  return (COMPANY_TABS.find((t) => t.v !== "dropped" && state.companies.some(t.test)) || { v: "p0" }).v;
 }
 
 export const searching = () => !!ui.cq.trim();
@@ -72,7 +72,7 @@ export function companyRows() {
     const loose = c.events.filter((e) => !e.program || !c.programs.some((p) => p.id === e.program));
     const nx = nextEvent({ events: loose });
     return `
-      <li class="co-item">
+      <li class="co-item${isDropped(c) ? " is-dropped" : ""}">
         <a class="co-row" href="#/c/${esc(c.slug)}">
           ${avatar(c)}
           <span class="co-body">
@@ -91,12 +91,14 @@ export function companyRows() {
     p2: "受けたい企業。",
     p1: "様子を見ている企業。",
     p0: "志望度を決めていない企業。企業ページの★で志望度を付けると、上のタブに移ります。",
+    dropped: "行かないと決めた企業。ホームと予定には出ません。企業ページの「見送りをやめる」で元のタブに戻ります。",
   };
   const empty = {
     p3: "第一志望群の企業はまだありません。企業ページの★を3つにすると、ここに出ます。",
     p2: "受けたい企業はまだありません。企業ページの★を2つにすると、ここに出ます。",
     p1: "様子見の企業はまだありません。企業ページの★を1つにすると、ここに出ます。",
     p0: "志望度を決めていない企業はありません。",
+    dropped: "見送りにした企業はありません。行かないと決めた企業は、企業ページのいちばん下の「この企業を見送る」で、ここに移せます。",
   };
   if (searching()) return items.length ? `<ul class="co-list">${items.map(row).join("")}</ul>` : `<p class="empty">見つかりません。</p>`;
   return `<p class="hint tab-hint">${hints[tab]}</p>` + (items.length ? `<ul class="co-list">${items.map(row).join("")}</ul>` : `<p class="empty">${empty[tab]}</p>`);

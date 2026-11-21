@@ -1,6 +1,6 @@
 // 画面の操作を受け取る
 
-import { addRecord, addTodo, finishTodo, markDone, markWaiting, saveMypage, setResultDate, statusClick, undoable } from "./actions.js";
+import { addRecord, addTodo, dropCompany, finishTodo, markDone, markWaiting, saveMypage, setResultDate, statusClick, undoable } from "./actions.js";
 import { DEFAULT_FLOW, FINALS_DIR, PRIORITY_LABEL } from "./config.js";
 import { addDocPath, commit, DOC_KEY, idle, loadCompanies, loadDocList, newId, normalize, saveDoc } from "./data.js";
 import { addDays, isoOf, isoToday, today } from "./dates.js";
@@ -45,6 +45,14 @@ document.addEventListener("click", async (ev) => {
   }
   if (t.dataset.sheet) return openSheet(t.dataset.sheet);
   if (t.dataset.modal) return openModal(t.dataset.modal);
+  // 企業として見送る・やめる
+  if (t.dataset.drop) {
+    const [slug, mode] = t.dataset.drop.split(":");
+    const c = bySlug(slug);
+    if (mode === "on" && !confirm(`${c.name} を見送りにします（行かないと決めた企業として、ホーム・予定・志望度のタブから外します）。`)) return;
+    t.disabled = true;
+    return dropCompany(slug, mode === "on");
+  }
   // 志望の企業で選考がないとき: 次の募集を確かめた日を残す
   if (t.dataset.checked) {
     const slug = t.dataset.checked;

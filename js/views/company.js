@@ -274,6 +274,7 @@ export function viewCompany(slug, pid) {
       </div>
       ${editBtn(`basic:${slugE}`, "基本情報を編集")}
     </header>
+    ${c.dropped ? `<section class="dropped-banner"><p><b>見送りにした企業</b><span>${esc(fmtDate(c.dropped))}に行かないと決めました。ホームと予定には出ません。</span></p><button class="btn" data-drop="${slugE}:off">見送りをやめる</button></section>` : ""}
     ${linkBar(c, p)}`;
 
   // 選考ルートが複数あれば1行ずつ並べ、選んだルートの中身をその下に開く
@@ -305,5 +306,10 @@ export function viewCompany(slug, pid) {
       .map((t) => `<li><label><input type="checkbox" data-todo-done="${slugE}" value="${esc(t)}"><span class="ck-body"><span class="ck-title">${esc(t)}</span></span></label></li>`)
       .join("")}</ul>` : `<p class="hint">調べること・転記することなど。済んだらチェックで消えます。</p>`}
   </section>`;
+  // 企業として見送る（行かないと決めた）。選考ルートの状況は残すので、やめれば元に戻る
+  if (!c.dropped) {
+    html += `<section class="drop-row"><button class="btn quiet wide" data-drop="${slugE}:on">この企業を見送る（行かないと決めた）</button>
+      <p class="hint">ホーム・予定・志望度のタブから外れ、企業一覧の「見送り」のタブに移ります。選考ルートの状況やメモはそのまま残ります。</p></section>`;
+  }
   return html;
 }

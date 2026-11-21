@@ -29,7 +29,7 @@
 
 .ctabs {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   margin: 0 0 12px;
   border-bottom: 1px solid var(--rule);
 }
@@ -107,4 +107,11 @@
   .co-item > .co-check { margin-left: 12px; }
   .ctabs button { font-size: 0.8125rem; }
   .ctabs button span { display: block; margin: 0; font-size: 0.875rem; line-height: 1.2; }
+}
+
+/* 見送りにした企業: 薄く */
+.co-item.is-dropped { opacity: 0.6; }
+.co-status.st-dropped { border-color: transparent; background: none; color: var(--faint); text-decoration: line-through; }
+@media (max-width: 480px) {
+  .ctabs button { font-size: 0.8125rem; }
 }

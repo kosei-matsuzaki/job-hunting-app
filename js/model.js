@@ -15,7 +15,11 @@ export function companyState(c) {
   return c.programs.map((p) => p.state).sort((a, b) => STATE_RANK[a] - STATE_RANK[b])[0];
 }
 
-export const isEnded = (c) => ENDED.has(companyState(c));
+// 企業として見送った（行かないと決めた）。dropped にその日を持つ。選考ルートの状況はそのまま残す
+export const isDropped = (c) => !!c.dropped;
+
+// 終わった企業: 企業として見送ったか、どのルートも見送り・辞退・不合格。予定はホーム・カレンダーに出さない
+export const isEnded = (c) => isDropped(c) || ENDED.has(companyState(c));
 
 const evKey = (e) => e.date + (e.time || "99:99");
 
@@ -95,6 +99,7 @@ export const stepEvents = (c, p, i) =>
 // 内定 → 選考中 → 応募前（これからの予定がある）→ 選考なし（予定がない・全部終わった）。
 // 志望度が付いた企業で選考がなければ「要確認」にして、次の募集を確かめるよう促す
 export function companyStatus(c) {
+  if (isDropped(c)) return { k: "dropped", label: "見送り", rank: 6 };
   const s = companyState(c);
   if (s === "offer") return { k: "offer", label: "内定", rank: 0 };
   if (s === "todo") return { k: "todo", label: "選考中", rank: 1 };

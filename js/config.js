@@ -54,11 +54,13 @@ export const STATE_RANK = { offer: 0, todo: 1, plan: 2, skip: 3, declined: 4, re
 
 // 企業一覧のタブ
 // 企業一覧のタブは志望度で分ける（行きたい企業は、選考がなくても落ちても同じ場所に残す）。選考の状況は行のラベルで
+// 企業として見送った企業は志望度のタブから外し、「見送り」のタブにまとめる
 export const COMPANY_TABS = [
-  { v: "p3", label: "第一志望群", test: (c) => c.priority === 3 },
-  { v: "p2", label: "受けたい", test: (c) => c.priority === 2 },
-  { v: "p1", label: "様子見", test: (c) => c.priority === 1 },
-  { v: "p0", label: "未設定", test: (c) => !c.priority },
+  { v: "p3", label: "第一志望群", test: (c) => !c.dropped && c.priority === 3 },
+  { v: "p2", label: "受けたい", test: (c) => !c.dropped && c.priority === 2 },
+  { v: "p1", label: "様子見", test: (c) => !c.dropped && c.priority === 1 },
+  { v: "p0", label: "未設定", test: (c) => !c.dropped && !c.priority },
+  { v: "dropped", label: "見送り", test: (c) => !!c.dropped },
 ];
 
 // 志望の企業で選考がないとき、何日確認していなければ目立たせるか

@@ -364,3 +364,11 @@ main[data-view="c"] .card { margin-top: 28px; }
 .login-box { position: relative; padding-right: 50px; min-height: 52px; }
 .login-box > .ic-edit { position: absolute; top: 50%; right: 5px; margin: 0; transform: translateY(-50%); }
 .login-box.is-empty { padding-right: 0; min-height: 0; }
+
+/* 企業として見送った: いちばん上の帯と、いちばん下のボタン */
+.dropped-banner { display: flex; align-items: center; gap: 12px; margin: 0 0 16px; padding: 12px 14px; border: 1px dashed var(--faint); border-radius: 8px; background: var(--sheet); }
+.dropped-banner p { display: flex; flex: 1; flex-direction: column; gap: 2px; margin: 0; font-size: 0.8125rem; }
+.dropped-banner p span { color: var(--muted); }
+.dropped-banner .btn { flex: none; }
+.drop-row { margin: 40px 0 0; padding-top: 16px; border-top: 1px solid var(--rule); }
+.drop-row .hint { margin: 8px 0 0; font-size: 0.75rem; }
