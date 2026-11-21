@@ -89,3 +89,6 @@
 /* 今月の一覧で畳んだ、今日より前の予定 */
 .cal-past { margin: 10px 0 0; }
 .cal-past > summary { padding: 10px 0; color: var(--muted); font-size: 0.8125rem; font-weight: 700; cursor: pointer; }
+
+/* 月の一覧の「結果の連絡（相手の番）」 */
+.turn-sec { margin-top: 24px; }

@@ -57,8 +57,9 @@ export function pendingResult(c, p) {
   return r && (!nx || r.date <= nx.date) ? r : null;
 }
 
-// 選考中で、いまの段階を受け終えた（waiting）か、そのルートにこれからの予定がないか、結果の連絡を先に待っている（相手の番）
-export const isWaiting = (c, p) => p.state === "todo" && (!!p.waiting || !nextEvent(c, p.id) || !!pendingResult(c, p));
+// 結果待ち（相手の番）: 選考中で、いまの段階を受け終えた印（waiting）があるか、結果の連絡を先に待っている。
+// これからの予定がないだけなら結果待ちにはしない（アンケート・WEBテストのように、日付のない自分の番もあるので）
+export const isWaiting = (c, p) => p.state === "todo" && (!!p.waiting || !!pendingResult(c, p));
 
 export const hasLogin = (c) => !!(c.mypage.url || c.mypage.id || c.mypage.password);
 

@@ -1,9 +1,9 @@
 // 画面: ホーム
 
 import { PAST_DAYS, WD } from "../config.js";
-import { addDays, dayLabel, daysUntil, fmtDate, isoOf, today, urgency, whenText } from "../dates.js";
+import { addDays, dayLabel, daysUntil, fmtDate, isoOf, remainText, today, urgency, whenText } from "../dates.js";
 import { esc } from "../md.js";
-import { byWhen, companyStatus, isEnded, isResult, isWaiting, liveEvents, nextEvent, pendingResult, sinceChecked } from "../model.js";
+import { byWhen, companyStatus, isEnded, isResult, isWaiting, liveEvents, nextEvent, pendingResult, resultEvent, sinceChecked } from "../model.js";
 import { checkLine, statusTag } from "./companies.js";
 import { avatar, eventRow, groupByDay, ICONS, kindBadge, resultWhen, routeMini } from "../parts.js";
 import { state, ui } from "../store.js";
@@ -12,17 +12,22 @@ export function viewHome() {
   const t = today();
   // 終了した企業（見送り・辞退・不合格）の予定は出さない
   const live = liveEvents();
-  const upcoming = live.filter((e) => daysUntil(e.date) >= 0).sort(byWhen);
+  // 自分の番（締切・日程）と相手の番（結果の連絡）を分ける。ホームの予定の一覧は自分の番だけ
+  const upcoming = live.filter((e) => daysUntil(e.date) >= 0 && !isResult(e)).sort(byWhen);
   const week = upcoming.filter((e) => daysUntil(e.date) <= 6);
-  const overdue = live.filter((e) => daysUntil(e.date) < 0 && daysUntil(e.date) >= -PAST_DAYS).sort(byWhen);
-  const active = state.companies
-    .flatMap((c) => c.programs.filter((p) => p.state === "todo").map((p) => {
-      // 結果の連絡を先に待っているなら、そちらを出す
-      const r = pendingResult(c, p);
-      return { c, p, nx: r ? null : nextEvent(c, p.id), r };
-    }))
-    // 自分の予定があるもの → 結果の連絡日が分かっているもの → どちらもないもの
-    .sort((a, b) => !a.nx - !b.nx || !a.r - !b.r || byWhen(a.nx || a.r || { date: "9999" }, b.nx || b.r || { date: "9999" }));
+  const weekResults = live.filter((e) => isResult(e) && daysUntil(e.date) >= 0 && daysUntil(e.date) <= 6);
+  const overdue = live.filter((e) => daysUntil(e.date) < 0 && daysUntil(e.date) >= -PAST_DAYS && !isResult(e)).sort(byWhen);
+  const routes = state.companies.flatMap((c) => c.programs.filter((p) => p.state === "todo").map((p) => ({ c, p })));
+  // 選考中で自分の番: 次の締切・日程が近い順、未登録は最後
+  const myTurn = routes
+    .filter(({ c, p }) => !isWaiting(c, p))
+    .map((x) => ({ ...x, nx: nextEvent(x.c, x.p.id) }))
+    .sort((a, b) => !a.nx - !b.nx || byWhen(a.nx || { date: "9999" }, b.nx || { date: "9999" }));
+  // 結果待ち（相手の番）: 連絡の予定日が近い順（過ぎたものが先）、未登録は最後
+  const waits = routes
+    .filter(({ c, p }) => isWaiting(c, p))
+    .map((x) => ({ ...x, r: pendingResult(x.c, x.p) || resultEvent(x.c, x.p.id) }))
+    .sort((a, b) => !a.r - !b.r || byWhen(a.r || { date: "9999" }, b.r || { date: "9999" }));
   const byStatus = (...ks) => state.companies.filter((c) => ks.includes(companyStatus(c).k));
   // 志望の企業で選考がないもの（次の募集を確かめる）。長く確かめていないものから
   const checks = byStatus("check").sort((a, b) => (sinceChecked(b) ?? 9999) - (sinceChecked(a) ?? 9999) || (b.priority || 0) - (a.priority || 0));
@@ -31,17 +36,16 @@ export function viewHome() {
     <header class="page-head">
       <h1 class="page-title">${t.getMonth() + 1}月${t.getDate()}日<span class="wd">${WD[t.getDay()]}曜日</span></h1>
     </header>
-    <nav class="tally" aria-label="企業の状況">
-      ${active.length ? `<button class="tally-item" data-jump="active-card"><b>${byStatus("todo", "offer").length}</b>選考中</button>` : `<a href="#/companies" class="tally-item"><b>${byStatus("todo", "offer").length}</b>選考中</a>`}
-      <a href="#/companies" data-goto-tab="p3" class="tally-item"><b>${state.companies.filter((c) => c.priority === 3).length}</b>第一志望群</a>
+    <nav class="tally" aria-label="選考の状況">
+      ${myTurn.length ? `<button class="tally-item turn-mine" data-jump="mine-card"><b>${myTurn.length}</b>自分の番</button>` : `<span class="tally-item"><b>0</b>自分の番</span>`}
+      ${waits.length ? `<button class="tally-item turn-wait" data-jump="wait-card"><b>${waits.length}</b>結果待ち</button>` : `<span class="tally-item"><b>0</b>結果待ち</span>`}
       ${checks.length ? `<button class="tally-item${checks.length ? " warn" : ""}" data-jump="check-card"><b>${checks.length}</b>要確認</button>` : `<span class="tally-item"><b>0</b>要確認</span>`}
     </nav>
     <div class="dash"><div class="dash-main">`;
 
   // 説明会より、応募（本選考・インターン）の締切を先に出す
   // 結果の連絡は相手の番なので、日めくりには出さない
-  const mine = upcoming.filter((e) => !isResult(e));
-  const next = mine.find((e) => e.p?.kind !== "説明会・イベント") || mine[0];
+  const next = upcoming.find((e) => e.p?.kind !== "説明会・イベント") || upcoming[0];
   if (next) {
     const n = daysUntil(next.date);
     const m = next.c.mypage;
@@ -70,17 +74,20 @@ export function viewHome() {
   }
 
   // 1週間の帯
-  html += `<section class="card week-card"><h2 class="card-title">この1週間<a class="act" href="#/calendar">${ICONS.cal}カレンダー</a></h2><ol class="week-strip" aria-label="今週">`;
+  // 帯の数は自分の予定だけ。結果の連絡がある日は、破線の印を添える
+  html += `<section class="card week-card"><h2 class="card-title"><span class="turn-tag mine">自分の番</span>この1週間<a class="act" href="#/calendar">${ICONS.cal}カレンダー</a></h2><ol class="week-strip" aria-label="今週">`;
   for (let i = 0; i < 7; i++) {
     const d = addDays(t, i);
     const iso = isoOf(d);
     const dayEvents = week.filter((e) => e.date === iso);
-    const mark = dayEvents.some((e) => !e.kind || e.kind === "deadline") ? "deadline" : dayEvents.some((e) => e.kind === "event") ? "event" : "result";
+    const dayResults = weekResults.filter((e) => e.date === iso);
+    const mark = dayEvents.some((e) => !e.kind || e.kind === "deadline") ? "deadline" : "event";
+    const label = `${fmtDate(iso)} 予定${dayEvents.length}件${dayResults.length ? `・結果の連絡${dayResults.length}件` : ""}`;
     html += `
-      <li><a href="#/calendar/${iso}" class="${i === 0 ? "today" : ""} ${dayEvents.length ? "has" : ""}" aria-label="${esc(fmtDate(iso))} 予定${dayEvents.length}件">
+      <li><a href="#/calendar/${iso}" class="${i === 0 ? "today" : ""} ${dayEvents.length ? "has" : ""}" aria-label="${esc(label)}">
         <span class="ws-wd ${d.getDay() === 0 ? "sun" : d.getDay() === 6 ? "sat" : ""}">${WD[d.getDay()]}</span>
         <span class="ws-d">${d.getDate()}</span>
-        <span class="ws-n">${dayEvents.length ? `<i class="${mark}"></i>${dayEvents.length > 1 ? dayEvents.length : ""}` : ""}</span>
+        <span class="ws-n">${dayEvents.length ? `<i class="${mark}"></i>${dayEvents.length > 1 ? dayEvents.length : ""}` : ""}${dayResults.length ? '<i class="result"></i>' : ""}</span>
       </a></li>`;
   }
   html += `</ol>`;
@@ -104,18 +111,35 @@ export function viewHome() {
   }
   html += `</div><div class="dash-side">`;
 
-  if (active.length) {
-    html += `<section class="card" id="active-card"><h2 class="sec">選考中のルート<span class="count">${active.length}</span></h2><ul class="active-list">`;
-    for (const { c, p, nx, r } of active) {
+  // 選考中のルートを、自分の番（締切・日程に向けて動く）と結果待ち（相手の番・確認だけ）に分ける
+  if (myTurn.length) {
+    html += `<section class="card turn-card is-mine" id="mine-card"><h2 class="sec"><span class="turn-tag mine">自分の番</span>選考中で次は自分<span class="count">${myTurn.length}</span></h2><ul class="active-list">`;
+    for (const { c, p, nx } of myTurn) {
       html += `
         <li><a class="active-row" href="#/c/${esc(c.slug)}/${esc(p.id)}">
           ${avatar(c)}
           <span class="ar-body">
             <span class="ar-name">${esc(c.name)}</span>
-            <span class="ar-prog">${routeMini(p)}<b>${esc(p.step || "")}</b>${isWaiting(c, p) ? '<span class="tag wait">結果待ち</span>' : ""}${c.programs.length > 1 ? kindBadge(p.kind, true) : ""}</span>
-            ${nx ? `<span class="ar-next ${urgency(daysUntil(nx.date))}">${esc(fmtDate(nx.date))} ${esc(nx.title)}</span>` : ""}
-            ${r ? (() => { const w = resultWhen(r); return `<span class="ar-next is-result ${w.cls}">${esc(w.text)}<em>${esc(w.left)}</em></span>`; })() : ""}
-            ${!nx && !r ? `<span class="ar-next faint">結果の連絡日は未登録</span>` : ""}
+            <span class="ar-prog">${routeMini(p)}<b>${esc(p.step || "")}</b>${c.programs.length > 1 ? kindBadge(p.kind, true) : ""}</span>
+            ${nx ? `<span class="ar-next ${urgency(daysUntil(nx.date))}">${esc(fmtDate(nx.date))} ${esc(nx.title)}<em>${esc(remainText(daysUntil(nx.date)))}</em></span>` : `<span class="ar-next unset" title="企業ページで締切を入れるか、受けたなら「受けた・結果待ち」を押す">次の締切・日程が未登録</span>`}
+          </span>
+        </a></li>`;
+    }
+    html += `</ul></section>`;
+  }
+
+  if (waits.length) {
+    html += `<section class="card turn-card is-wait" id="wait-card"><h2 class="sec"><span class="turn-tag wait">相手の番</span>結果待ち<span class="count">${waits.length}</span></h2>
+      <p class="hint">確認するだけ。連絡が来たら、企業ページで通過・不合格を押します。</p><ul class="active-list">`;
+    for (const { c, p, r } of waits) {
+      const w = r && resultWhen(r);
+      html += `
+        <li><a class="active-row" href="#/c/${esc(c.slug)}/${esc(p.id)}">
+          ${avatar(c)}
+          <span class="ar-body">
+            <span class="ar-name">${esc(c.name)}</span>
+            <span class="ar-prog">${routeMini(p)}<b>${esc(p.step || "")}</b>${c.programs.length > 1 ? kindBadge(p.kind, true) : ""}</span>
+            ${w ? `<span class="ar-next is-result ${w.cls}">${esc(w.text)}<em>${esc(w.cls === "late" ? "予定日を過ぎた・メールを確認" : w.left)}</em></span>` : `<span class="ar-next faint">結果の連絡日は未登録</span>`}
           </span>
         </a></li>`;
     }

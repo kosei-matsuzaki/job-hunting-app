@@ -3,7 +3,7 @@
 import { WD } from "../config.js";
 import { addDays, dayLabel, fmtDate, isoOf, isoToday, parseDate } from "../dates.js";
 import { esc } from "../md.js";
-import { allEvents, byWhen, isEnded } from "../model.js";
+import { allEvents, byWhen, isEnded, isResult } from "../model.js";
 import { eventRow, evClass, ICONS } from "../parts.js";
 
 export function viewCalendar(sel) {
@@ -62,10 +62,11 @@ export function viewCalendar(sel) {
     html += `</div>`;
   }
   html += `</div>
-    <p class="cal-legend"><i class="deadline"></i>締切 <i class="event"></i>日程 <i class="result"></i>結果の連絡 <i class="done"></i>済み</p>
+    <p class="cal-legend"><i class="deadline"></i>締切 <i class="event"></i>日程 <i class="result"></i>結果の連絡（相手の番） <i class="done"></i>済み</p>
     </div><div class="cal-aside">`;
 
-  const dayEvents = (byDate.get(selected) || []).sort(byWhen);
+  // 自分の番（締切・日程）を先に、結果の連絡（相手の番）をあとに
+  const dayEvents = (byDate.get(selected) || []).sort((a, b) => isResult(a) - isResult(b) || byWhen(a, b));
   html += `<section class="sheet day-sheet">
     <h2 class="day-head">${esc(dayLabel(selected))}</h2>
     ${dayEvents.length ? `<ul class="ev-list">${dayEvents.map((e) => eventRow(e)).join("")}</ul>` : `<p class="hint">この日の予定はありません。</p>`}
@@ -79,11 +80,17 @@ export function viewCalendar(sel) {
     const ahead = monthEvents.filter((e) => e.date >= t);
     const past = monthEvents.filter((e) => e.date < t);
     const rows = (list) => `<ul class="ev-list plain">${list.map((e) => eventRow(e, { date: true })).join("")}</ul>`;
-    html += `<h2 class="sec">${m + 1}月の予定<span class="count">${monthEvents.length}</span></h2>`;
-    if (ahead.length && past.length) {
-      html += rows(ahead) + `<details class="cal-past"><summary>今日より前の予定<span class="count">${past.length}</span></summary>${rows(past)}</details>`;
-    } else {
-      html += rows(monthEvents);
+    // 自分が出す・参加するもの と、結果の連絡を待つだけのもの を分ける
+    const mineAhead = ahead.filter((e) => !isResult(e));
+    const resultAhead = ahead.filter(isResult);
+    html += `<h2 class="sec"><span class="turn-tag mine">自分の番</span>${m + 1}月の予定<span class="count">${mineAhead.length}</span></h2>`;
+    html += mineAhead.length ? rows(mineAhead) : `<p class="hint">${past.length ? "これからの" : ""}締切・日程はありません。</p>`;
+    if (resultAhead.length) {
+      html += `<h2 class="sec turn-sec"><span class="turn-tag wait">相手の番</span>結果の連絡<span class="count">${resultAhead.length}</span></h2>
+        <p class="hint">確認するだけ。この日までに連絡が来る予定です。</p>${rows(resultAhead)}`;
+    }
+    if (past.length) {
+      html += `<details class="cal-past"><summary>今日より前の予定<span class="count">${past.length}</span></summary>${rows(past)}</details>`;
     }
   }
   html += `</div></div><div class="fab-space"></div><a class="fab" href="#/add/${selected}" aria-label="予定を追加">${ICONS.plus}</a>`;

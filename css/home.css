@@ -156,3 +156,7 @@ button.tally-item { border-top: 0; border-right: 0; border-bottom: 0; background
 .check-co { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--ink); text-decoration: none; }
 .check-co .avatar { width: 30px; height: 30px; font-size: 0.8125rem; }
 .check-list .co-check { margin: 0 0 10px; }
+
+/* 選考中を自分の番と結果待ちに分けたカード */
+.turn-card.is-wait .active-row .avatar { border-style: dashed; }
+.ws-n i.result { margin-left: 3px; }

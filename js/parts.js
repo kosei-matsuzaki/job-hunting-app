@@ -67,6 +67,9 @@ export function progRow(c, p, { href = `#/c/${c.slug}/${p.id}`, current = false 
   } else if (nx && !ENDED.has(s)) {
     const n = daysUntil(nx.date);
     when = `<span class="cp-when ${urgency(n)}"><b>${esc(fmtDate(nx.date))}</b><span class="cp-ev">${esc(nx.title)}</span><em>${esc(remainText(n))}</em></span>`;
+  } else if (s === "todo") {
+    // 選考中で自分の番なのに日付がない（アンケート・WEBテストの案内待ちなど）
+    when = `<span class="cp-when"><span class="cp-quiet">次の締切・日程は未登録</span></span>`;
   }
   return `<a class="cp-row st-${s}" href="${esc(href)}"${current ? ' aria-current="true"' : ""}>
     <span class="cp-kind ${KIND_CLASS[p.kind] || "main"}">${esc(KIND_SHORT[p.kind] || p.kind)}</span><span class="cp-title">${esc(p.title || p.kind)}</span><span class="cp-state">${state}</span>${when}</a>`;
@@ -86,7 +89,7 @@ export const stars = (c) => (c.priority ? `<span class="stars-mini" title="志�
 
 export function eventTitle(e, showProgram = false) {
   return (
-    (e.kind === "event" ? '<span class="tag event">日程</span>' : e.kind === "result" ? '<span class="tag result">結果</span>' : "") +
+    (e.kind === "event" ? '<span class="tag event">日程</span>' : "") +
     (showProgram && e.p && e.c.programs.length > 1 ? `<span class="tag prog">${esc(KIND_SHORT[e.p.kind] || e.p.kind)}</span>` : "") +
     esc(e.title) +
     (e.tentative ? '<span class="tag tentative">目安</span>' : "")
@@ -112,7 +115,7 @@ export function eventRow(e, { date = false, tick = true } = {}) {
     <li class="ev-row is-${evClass(e)} ${e.done ? "done" : urgency(n)}">
       <div class="ev-when">
         ${date ? `<span class="ev-date">${esc(fmtDate(e.date))}</span>` : ""}
-        <span class="ev-time">${esc(e.time || { event: "終日", result: "連絡" }[e.kind] || "締切")}</span>
+        <span class="ev-time">${esc(e.time || { event: "終日", result: "結果" }[e.kind] || "締切")}</span>
       </div>
       <div class="ev-main">
         <a class="ev-co" href="#/c/${esc(e.c.slug)}${e.p ? `/${esc(e.p.id)}` : ""}">${esc(e.c.name)}</a>

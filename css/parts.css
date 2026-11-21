@@ -244,3 +244,14 @@
 .ck-body { display: flex; flex-direction: column; min-width: 0; line-height: 1.45; }
 .ck-when { color: var(--muted); font-family: var(--num); font-size: 0.875rem; font-weight: 500; font-variant-numeric: tabular-nums; }
 .checklist li.done .ck-title { color: var(--muted); text-decoration: line-through; }
+
+/* 自分の番と相手の番。自分の番は墨のベタ、相手の番（結果待ち・結果の連絡）は破線で描き分ける */
+.turn-tag { display: inline-block; flex: none; margin-right: 8px; padding: 1px 6px; border: 1px solid var(--ink); border-radius: 3px; font-size: 0.6875rem; font-weight: 700; line-height: 1.5; }
+.turn-tag.mine { background: var(--ink); color: var(--paper); }
+.turn-tag.wait { border-style: dashed; background: none; color: var(--ink); }
+.sec .turn-tag, .card-title .turn-tag { align-self: center; margin-right: 0; }
+.ev-row.is-result .ev-time { border: 1px dashed var(--ink); border-radius: 3px; padding: 0 4px; align-self: flex-start; font-family: var(--font); font-size: 0.75rem; font-weight: 700; }
+.ev-row.is-result .ev-title { color: var(--muted); }
+.ev-row.is-result.urgent .ev-left, .ev-row.is-result.soon .ev-left { color: var(--muted); font-weight: 500; }
+.ev-row.is-result .tick { border-style: dashed; }
+.ar-next.unset { color: var(--muted); }
