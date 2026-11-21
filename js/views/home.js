@@ -85,19 +85,22 @@ export function viewHome() {
   }
   html += `</ol>`;
 
-  if (week.length) {
+  // 上の「次の締切」に大きく出した予定は、下の一覧には重ねて出さない（帯の件数には数える）
+  const weekRest = week.filter((e) => e !== next);
+  if (weekRest.length) {
     html += `<section class="sheet agenda">`;
-    for (const [iso, evs] of groupByDay(week)) {
+    for (const [iso, evs] of groupByDay(weekRest)) {
       html += `<h2 class="day-head ${urgency(daysUntil(iso))}">${esc(dayLabel(iso))}</h2><ul class="ev-list">${evs.map((e) => eventRow(e)).join("")}</ul>`;
     }
     html += `</section>`;
   } else {
-    html += `<p class="hint week-empty">この1週間に予定はありません。</p>`;
+    html += `<p class="hint week-empty">この1週間に${week.length ? "ほかの" : ""}予定はありません。</p>`;
   }
   html += `</section>`;
-  const later = upcoming.filter((e) => daysUntil(e.date) > 6).slice(0, 5);
+  // カレンダーへの入口は「この1週間」の見出しに1つだけ置く
+  const later = upcoming.filter((e) => daysUntil(e.date) > 6 && e !== next).slice(0, 5);
   if (later.length) {
-    html += `<section class="card"><h2 class="sec">その先の予定<a class="act" href="#/calendar">${ICONS.cal}カレンダー</a></h2><ul class="ev-list plain">${later.map((e) => eventRow(e, { date: true })).join("")}</ul></section>`;
+    html += `<section class="card"><h2 class="sec">その先の予定</h2><ul class="ev-list plain">${later.map((e) => eventRow(e, { date: true })).join("")}</ul></section>`;
   }
   html += `</div><div class="dash-side">`;
 
